@@ -10,8 +10,11 @@
 #include <conio.h>
 #include <vector>
 
+
 #include "include/samplerate.h"
 #include "include/sndfile.h"
+#include "include/soxr.h"
+
 
 using namespace std;
 
@@ -43,9 +46,9 @@ typedef struct {
 } WAVHEADER;
 //-------------------------------------------------------------------------------------
 
-int reSampleRate(const char* inputFilename, const char* outputFilename)
+int reSampleRate_libsamplerate(const char* inputFilename, const char* outputFilename)
 {
-	cout << "ReSampleing audio..." << endl;
+	cout << "ReSampleing audio with libsamplerate..." << endl;
 
 	// Open input file
 	SF_INFO inputInfo;
@@ -125,8 +128,113 @@ int reSampleRate(const char* inputFilename, const char* outputFilename)
 	return 0;
 }
 
+int reSampleRate_libsoxr(const char* inputFilename, const char* outputFilename)
+{
+	cout << "ReSampleing audio with libsoxr..." << endl;
+	// Open the input WAV file
+	SF_INFO inputInfo;
+	SNDFILE* inputFile = sf_open(inputFilename, SFM_READ, &inputInfo);
+	if (!inputFile)
+	{
+		// Handle the error
+		return -1;
+	}
+
+	// Get the input WAV file format
+	
+	sf_command(inputFile, SFC_GET_CURRENT_SF_INFO, &inputInfo, sizeof(inputInfo));
+
+	// Calculate the output sample rate and number of samples
+	const double inputSampleRate = static_cast<double>(inputInfo.samplerate);
+	const double outputSampleRate = static_cast<double>(inputInfo.samplerate * RESAMPLE_RATIO);
+	const size_t numSamples = static_cast<size_t>(inputInfo.frames * (outputSampleRate / inputSampleRate));
+
+	// Allocate memory for the input and output buffers
+	float* inputBuffer = new float[inputInfo.frames * inputInfo.channels];
+	float* outputBuffer = new float[numSamples * inputInfo.channels];
+
+	// Read the input WAV file data into the input buffer
+	const sf_count_t numFrames = sf_readf_float(inputFile, inputBuffer, inputInfo.frames);
+	if (numFrames != inputInfo.frames)
+	{
+		// Handle the error
+		delete[] inputBuffer;
+		delete[] outputBuffer;
+		sf_close(inputFile);
+		return -1;
+	}
+
+	// Create the libsoxr resampler
+	soxr_error_t error;
+	soxr_quality_spec_t quality = soxr_quality_spec(SOXR_HQ, 0);
+	soxr_io_spec_t ioSpec = soxr_io_spec(SOXR_FLOAT32_I, SOXR_FLOAT32_I);
+	soxr_t resampler = soxr_create(inputSampleRate, outputSampleRate, inputInfo.channels, &error, &ioSpec, &quality, nullptr);
+	if (error)
+	{
+		// Handle the error
+		delete[] inputBuffer;
+		delete[] outputBuffer;
+		sf_close(inputFile);
+		return -1;
+	}
+
+	// Resample the input buffer to the output buffer
+	size_t numInputSamples = inputInfo.frames;
+	size_t numOutputSamples = numSamples;
+	size_t numInputProcessed = 0;
+	size_t numOutputProcessed = 0;
+	soxr_process(resampler, inputBuffer, numInputSamples, &numInputProcessed, outputBuffer, numOutputSamples, &numOutputProcessed);
+
+	// Open the output WAV file
+	SF_INFO outputInfo = inputInfo;
+	outputInfo.samplerate = static_cast<int>(outputSampleRate);
+	SNDFILE* outputFile = sf_open(outputFilename, SFM_WRITE, &outputInfo);
+	if (!outputFile)
+	{
+		// Handle the error
+		soxr_delete(resampler);
+		delete[] inputBuffer;
+		delete[] outputBuffer;
+		sf_close(inputFile);
+		return -1;
+	}
+
+	// Write the output WAV file data from the output buffer
+	const sf_count_t numOutputFrames = numOutputProcessed / inputInfo.channels;
+	const sf_count_t numOutputWritten = sf_writef_float(outputFile, outputBuffer, numOutputFrames);
+	if (numOutputWritten != numOutputFrames)
+	{
+		// Handle the error
+		sf_close(outputFile);
+		soxr_delete(resampler);
+		delete[] inputBuffer;
+		delete[] outputBuffer;
+		sf_close(inputFile);
+		return -1;
+	}
+
+	// Close the input and output WAV files
+	sf_close(outputFile);
+	soxr_delete(resampler);
+	delete[] inputBuffer;
+	delete[] outputBuffer;
+	sf_close(inputFile);
+
+	// Checking sample rate
+	inputFile = sf_open(outputFilename, SFM_READ, &inputInfo);
+	if (!inputFile) {
+		std::cerr << "Failed to open input file" << std::endl;
+		return 1;
+	}
+	cout << "output Audio's sample rate is " << inputInfo.samplerate << endl;
+	sf_close(inputFile);
+
+	return 0;
+}
+
 int main()
 {
+#if 0
 	const int SAMPLE_RATE = 44100;
 	const int N = SAMPLE_RATE * DURATION * BIT_PER_SAMPLE / 8;
 	short int buffer[N];
@@ -218,8 +326,11 @@ int main()
 	}
 
 	cout << "Recording Finished" << endl;
+#endif
 
-	reSampleRate("recording.wav", "resample_out.wav");
+	reSampleRate_libsamplerate("recording.wav", "resample_out_libsamplrate.wav");
+	
+	reSampleRate_libsoxr("recording.wav", "resample_out_libsoxr.wav");
 
 	getchar();
 
