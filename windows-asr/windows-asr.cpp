@@ -1,5 +1,3 @@
-// windows-asr.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
 
 #include <iostream>
 #include <windows.h>
@@ -15,6 +13,28 @@
 #include "include/sndfile.h"
 #include "include/soxr.h"
 
+
+#include <mfapi.h>
+#include <mfidl.h>
+#include <mfreadwrite.h>
+#include <mferror.h>
+#include <mftransform.h>
+#include <mmdeviceapi.h>
+#include <mmreg.h>
+
+#include <vector>
+#include <dmo.h>
+#include <evr.h>
+#include <atlbase.h>
+#include <assert.h>
+#include <stdint.h>
+#include <wmcodecdsp.h>
+#include "WWMFResampler.h"
+
+#pragma comment(lib, "mfplat.lib")
+#pragma comment(lib, "mfuuid.lib")
+#pragma comment(lib, "mfreadwrite.lib")
+#pragma comment(lib, "wmcodecdspuuid.lib")
 
 using namespace std;
 
@@ -232,9 +252,198 @@ int reSampleRate_libsoxr(const char* inputFilename, const char* outputFilename)
 	return 0;
 }
 
+int reSampleRate_wmf(LPCWSTR inputFilename, LPCWSTR outputFilename)
+{
+	IMFSourceReader* pReader = NULL;
+	IMFMediaType* pInputType = NULL;
+	IMFMediaType* pOutputType = NULL;
+	IMFSinkWriter* pWriter = NULL;
+
+	DWORD streamIndex = 0;
+	LONGLONG duration = 0;
+	UINT32 inputSampleRate;
+	UINT32 numChannels = 0;
+	UINT32 bytepersecond = 0;
+	UINT32 blockAlign = 0;
+	UINT32 bitPerSample = 0;
+
+	HRESULT hr = S_OK;
+
+	cout << "ReSampleing audio with wmf..." << endl;
+
+	hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	hr = MFStartup(MF_VERSION);
+
+	hr = MFCreateSourceReaderFromURL(inputFilename, NULL, &pReader);
+	hr = MFCreateSinkWriterFromURL(outputFilename, NULL, NULL, &pWriter);
+
+	hr = pReader->GetCurrentMediaType((DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, &pInputType);
+	hr = pInputType->GetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, &inputSampleRate);
+	hr = pInputType->GetUINT32(MF_MT_AUDIO_NUM_CHANNELS, &numChannels);
+	hr = pInputType->GetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, &bytepersecond);
+	hr = pInputType->GetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, &blockAlign);
+	hr = pInputType->GetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, &bitPerSample);
+	UINT32 outputSampleRate = static_cast<UINT32>(inputSampleRate * RESAMPLE_RATIO);   //Sampe rate conversion ratio
+
+	hr = MFCreateMediaType(&pOutputType);
+	hr = pOutputType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
+	hr = pOutputType->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM);
+	hr = pOutputType->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, numChannels);
+	hr = pOutputType->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, outputSampleRate);
+	hr = pOutputType->SetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, blockAlign);
+	hr = pOutputType->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, bytepersecond);
+	hr = pOutputType->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, bitPerSample);
+	hr = pOutputType->SetUINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, TRUE);
+
+	// Setup the translation.
+	WWMFResampler iResampler;
+	WWMFPcmFormat inputFormat;
+
+	inputFormat.sampleFormat = WWMFBitFormatInt;
+	inputFormat.nChannels = numChannels;
+	inputFormat.sampleRate = inputSampleRate;
+	inputFormat.bits = bitPerSample;
+	inputFormat.validBitsPerSample = bitPerSample;
+
+	// System mix format.
+	WWMFPcmFormat outputFormat;
+	outputFormat.sampleFormat = WWMFBitFormatInt;
+	outputFormat.nChannels = numChannels;
+	outputFormat.sampleRate = outputSampleRate;
+	outputFormat.bits = bitPerSample;
+	outputFormat.validBitsPerSample = bitPerSample;
+
+	if (iResampler.Initialize(inputFormat, outputFormat, 60) == S_OK)
+	{
+		cout << "Initialize OK" << endl;
+	}
+
+	hr = pWriter->AddStream(pOutputType, &streamIndex);
+	hr = pWriter->SetInputMediaType(streamIndex, pInputType, NULL);
+	hr = pWriter->BeginWriting();
+
+	DWORD flags = 0;
+	LONGLONG timestamp = 0;
+
+	while (true)
+	{
+		WWMFSampleData sampleData_return;
+		DWORD flags = 0;
+		LONGLONG timestamp = 0;
+		IMFSample* pSample = NULL;
+
+		hr = pReader->ReadSample((DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, NULL, &flags, &timestamp, &pSample);
+		//printf("%I64d\n", timestamp);
+		if (FAILED(hr) || (flags & MF_SOURCE_READERF_ENDOFSTREAM))
+		{
+			break;
+		}
+
+		if (pSample)
+		{
+			hr = pSample->SetSampleTime(timestamp);
+
+			if (SUCCEEDED(hr))
+			{
+				hr = pSample->SetSampleDuration(duration);
+			}
+			CComPtr<IMFMediaBuffer> spBuffer;
+			hr = pSample->ConvertToContiguousBuffer(&spBuffer);
+			DWORD cbBytes = 0;
+			hr = spBuffer->GetCurrentLength(&cbBytes);
+
+			BYTE* pByteBuffer = NULL;
+			hr = spBuffer->Lock(&pByteBuffer, NULL, NULL);
+
+			BYTE* to = new BYTE[cbBytes]; //< output PCM data
+			DWORD toBytes = cbBytes;            //< output PCM data size
+			memcpy(to, pByteBuffer, cbBytes);
+
+			spBuffer->Unlock();
+
+			iResampler.Resample(to, toBytes, &sampleData_return);
+			//cout << "Original bytes = " << toBytes << endl;
+			//cout << "sampleData_return.bytes : " << sampleData_return.bytes << endl;
+
+			IMFSample* pOutputSample = NULL;
+
+			// create a new memory buffer
+			IMFMediaBuffer* pBuffer = NULL;
+			hr = MFCreateMemoryBuffer(sampleData_return.bytes, &pBuffer);
+
+			// lock the buffer and copy the data into the buffer
+			BYTE* pData = NULL;
+			hr = pBuffer->Lock(&pData, NULL, NULL);
+
+			memcpy_s(pData, sampleData_return.bytes, sampleData_return.data, sampleData_return.bytes);
+
+			hr = pBuffer->Unlock();
+
+			// set buffer data length
+			hr = pBuffer->SetCurrentLength(sampleData_return.bytes);
+
+			// Create a Media Sample and add buffers to it
+			hr = MFCreateSample(&pOutputSample);
+			hr = pOutputSample->AddBuffer(pBuffer);
+			hr = pOutputSample->SetSampleTime(timestamp);
+
+			if (SUCCEEDED(hr))
+			{
+				hr = pOutputSample->SetSampleDuration(duration);
+			}
+
+			hr = pWriter->WriteSample(streamIndex, pOutputSample);
+			pOutputSample->Release();
+
+			pSample->Release();
+}
+	}
+
+	hr = pWriter->SendStreamTick(streamIndex, duration);
+
+	iResampler.Finalize();
+
+	if (pWriter)
+	{
+		pWriter->Finalize();
+	}
+
+	if (pReader)
+	{
+		pReader->Release();
+	}
+
+	if (pInputType)
+	{
+		pInputType->Release();
+	}
+
+	if (pOutputType)
+	{
+		pOutputType->Release();
+	}
+
+	// Checking sample rate
+	hr = MFCreateSourceReaderFromURL(outputFilename, NULL, &pReader);
+
+	hr = pReader->GetCurrentMediaType((DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, &pInputType);
+	hr = pInputType->GetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, &inputSampleRate);
+	cout << "output Audio's sample rate is " << inputSampleRate << endl;
+	if (pReader)
+	{
+		pReader->Release();
+	}
+
+	if (pInputType)
+	{
+		pInputType->Release();
+	}
+
+	return hr;
+}
+
 int main()
 {
-#if 0
 	const int SAMPLE_RATE = 44100;
 	const int N = SAMPLE_RATE * DURATION * BIT_PER_SAMPLE / 8;
 	short int buffer[N];
@@ -326,11 +535,12 @@ int main()
 	}
 
 	cout << "Recording Finished" << endl;
-#endif
 
 	reSampleRate_libsamplerate("recording.wav", "resample_out_libsamplrate.wav");
 	
 	reSampleRate_libsoxr("recording.wav", "resample_out_libsoxr.wav");
+
+	reSampleRate_wmf(L"recording.wav", L"resample_out_wmf.wav");
 
 	getchar();
 
