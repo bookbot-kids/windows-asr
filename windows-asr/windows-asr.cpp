@@ -12,6 +12,7 @@
 #include "include/samplerate.h"
 #include "include/sndfile.h"
 #include "include/soxr.h"
+#include "c-api.h"
 
 
 #include <mfapi.h>
@@ -36,13 +37,19 @@
 #pragma comment(lib, "mfreadwrite.lib")
 #pragma comment(lib, "wmcodecdspuuid.lib")
 
+//#pragma comment(linker, "/ENTRY:ChangedEntry /NODEFAULTLIB /SUBSYSTEM:CONSOLE")
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 using namespace std;
 
 //--------------------------------  Global Variables --------------------------------
 const int FORMAT_TAG = WAVE_FORMAT_PCM;	// Audio Type
 const int NUMBER_OF_CHANNELS = 1;		// Number of channels
 const int BIT_PER_SAMPLE = 16;			// Bit per samples
-const int SAMPLE_RATE = 44100;			// Sample Rate 
+const int SAMPLE_RATE = 32000;			// Sample Rate 
 const int DURATION = 5;					// Recording Duration
 const double RESAMPLE_RATIO = 0.5;		// Resample rate
 //------------------------------------------------------------------------------------
@@ -442,9 +449,8 @@ int reSampleRate_wmf(LPCWSTR inputFilename, LPCWSTR outputFilename)
 	return hr;
 }
 
-int main()
+int record_audio()
 {
-	const int SAMPLE_RATE = 44100;
 	const int N = SAMPLE_RATE * DURATION * BIT_PER_SAMPLE / 8;
 	short int buffer[N];
 
@@ -533,6 +539,116 @@ int main()
 		WriteFile(hFile, WaveHdr.lpData, WaveHdr.dwBufferLength, &dwWrite, NULL);
 		CloseHandle(hFile);
 	}
+	return 0;
+}
+
+int recognize_audio(const char * audio_file)
+{
+	SherpaNcnnRecognizerConfig config;
+	config.model_config.tokens = "tokens.txt";
+	config.model_config.encoder_param = "encoder_jit_trace-pnnx.ncnn.param";
+	config.model_config.encoder_bin = "encoder_jit_trace-pnnx.ncnn.bin";
+	config.model_config.decoder_param = "decoder_jit_trace-pnnx.ncnn.param";
+	config.model_config.decoder_bin = "decoder_jit_trace-pnnx.ncnn.bin";
+	config.model_config.joiner_param = "joiner_jit_trace-pnnx.ncnn.param";
+	config.model_config.joiner_bin = "joiner_jit_trace-pnnx.ncnn.bin";
+
+	int32_t num_threads = 4;
+	//if (argc >= 10 && atoi(argv[9]) > 0) {
+	//	num_threads = atoi(argv[9]);
+	//}
+	config.model_config.num_threads = num_threads;
+	config.model_config.use_vulkan_compute = 0;
+
+	config.decoder_config.decoding_method = "greedy_search";
+
+	//if (argc == 11) {
+	//	config.decoder_config.decoding_method = argv[10];
+	//}
+
+	config.decoder_config.num_active_paths = 4;
+	config.enable_endpoint = 0;
+	config.rule1_min_trailing_silence = 2.4;
+	config.rule2_min_trailing_silence = 1.2;
+	config.rule3_min_utterance_length = 300;
+
+	config.feat_config.sampling_rate = 16000;
+	config.feat_config.feature_dim = 80;
+
+	SherpaNcnnRecognizer* recognizer = CreateRecognizer(&config);
+
+	const char* wav_filename = audio_file;
+	FILE* fp;
+	fopen_s(&fp, wav_filename, "rb");
+	if (!fp) {
+		fprintf(stderr, "Failed to open %s\n", wav_filename);
+		return -1;
+	}
+
+	// Assume the wave header occupies 44 bytes.
+	fseek(fp, 44, SEEK_SET);
+
+	// simulate streaming
+
+#define N 3200  // 0.2 s. Sample rate is fixed to 16 kHz
+
+	int16_t buffer[N];
+	float samples[N];
+
+	SherpaNcnnStream* s = CreateStream(recognizer);
+
+	SherpaNcnnDisplay* display = CreateDisplay(50);
+	int32_t segment_id = -1;
+
+	while (!feof(fp)) {
+		size_t n = fread((void*)buffer, sizeof(int16_t), N, fp);
+		if (n > 0) {
+			for (size_t i = 0; i != n; ++i) {
+				samples[i] = buffer[i] / 32768.;
+			}
+			AcceptWaveform(s, 16000, samples, n);
+			while (IsReady(recognizer, s)) {
+				Decode(recognizer, s);
+			}
+
+			SherpaNcnnResult* r = GetResult(recognizer, s);
+			if (strlen(r->text)) {
+				SherpaNcnnPrint(display, segment_id, r->text);
+			}
+			DestroyResult(r);
+		}
+	}
+	fclose(fp);
+
+	// add some tail padding
+	float tail_paddings[4800] = { 0 };  // 0.3 seconds at 16 kHz sample rate
+	AcceptWaveform(s, 16000, tail_paddings, 4800);
+
+	InputFinished(s);
+
+	while (IsReady(recognizer, s)) {
+		Decode(recognizer, s);
+	}
+	SherpaNcnnResult* r = GetResult(recognizer, s);
+	if (strlen(r->text)) {
+		SherpaNcnnPrint(display, segment_id, r->text);
+	}
+
+	DestroyResult(r);
+
+	DestroyDisplay(display);
+
+	DestroyStream(s);
+	DestroyRecognizer(recognizer);
+
+	fprintf(stderr, "\n");
+
+	return 0;
+}
+
+int main()
+{
+	record_audio();
 
 	cout << "Recording Finished" << endl;
 
@@ -541,6 +657,8 @@ int main()
 	reSampleRate_libsoxr("recording.wav", "resample_out_libsoxr.wav");
 
 	reSampleRate_wmf(L"recording.wav", L"resample_out_wmf.wav");
+
+	recognize_audio("resample_out_libsoxr.wav");
 
 	getchar();
 
