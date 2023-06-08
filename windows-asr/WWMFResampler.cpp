@@ -1,4 +1,8 @@
-﻿
+﻿/*
+* Author:    Volkodav Anton
+* Date:      6/5/2023
+* Copyright: Booktbot
+*/
 #pragma warning(disable:4127)  // Disable warning C4127: conditional expression is constant
 
 #define WINVER _WIN32_WINNT_WIN7
