@@ -52,6 +52,14 @@ const int BIT_PER_SAMPLE = 16;			// Bit per samples
 const int SAMPLE_RATE = 32000;			// Sample Rate 
 const int DURATION = 5;					// Recording Duration
 const double RESAMPLE_RATIO = 0.5;		// Resample rate
+
+typedef enum RESAMPLE_METHOD_S{
+	RESAMPLE_LIBSAMPLERATE,
+	RESAMPLE_LIBSOXR,
+	RESAMPLE_WMF
+} RESAMPLE_METHOD_E;
+
+RESAMPLE_METHOD_E resampleMethod;
 //------------------------------------------------------------------------------------
 
 
@@ -75,6 +83,7 @@ typedef struct {
 
 int reSampleRate_libsamplerate(const char* inputFilename, const char* outputFilename)
 {
+	resampleMethod = RESAMPLE_LIBSAMPLERATE;
 	cout << "ReSampleing audio with libsamplerate..." << endl;
 
 	// Open input file
@@ -157,6 +166,7 @@ int reSampleRate_libsamplerate(const char* inputFilename, const char* outputFile
 
 int reSampleRate_libsoxr(const char* inputFilename, const char* outputFilename)
 {
+	resampleMethod = RESAMPLE_LIBSOXR;
 	cout << "ReSampleing audio with libsoxr..." << endl;
 	// Open the input WAV file
 	SF_INFO inputInfo;
@@ -261,6 +271,8 @@ int reSampleRate_libsoxr(const char* inputFilename, const char* outputFilename)
 
 int reSampleRate_wmf(LPCWSTR inputFilename, LPCWSTR outputFilename)
 {
+
+	resampleMethod = RESAMPLE_WMF;
 	IMFSourceReader* pReader = NULL;
 	IMFMediaType* pInputType = NULL;
 	IMFMediaType* pOutputType = NULL;
@@ -578,15 +590,27 @@ int recognize_audio(const char * audio_file)
 	SherpaNcnnRecognizer* recognizer = CreateRecognizer(&config);
 
 	const char* wav_filename = audio_file;
-	FILE* fp;
+
+	FILE* fp = NULL;
 	fopen_s(&fp, wav_filename, "rb");
-	if (!fp) {
+	
+	if (!fp) 
+	{
 		fprintf(stderr, "Failed to open %s\n", wav_filename);
 		return -1;
 	}
 
-	// Assume the wave header occupies 44 bytes.
-	fseek(fp, 44, SEEK_SET);
+	if (resampleMethod == RESAMPLE_WMF) 
+	{
+		// Assume the wave header occupies 78 bytes. Becuse header size is 78 byte
+		fseek(fp, 78, SEEK_SET);
+	}
+	else 
+	{
+		// Assume the wave header occupies 44 bytes. Becuse header size is 44 byte.
+		fseek(fp, 44, SEEK_SET);
+	}
+	
 
 	// simulate streaming
 
