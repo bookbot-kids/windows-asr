@@ -556,6 +556,8 @@ int record_audio()
 
 int recognize_audio(const char * audio_file)
 {
+	cout << "Recognizing audio..." << endl;
+
 	SherpaNcnnRecognizerConfig config;
 	config.model_config.tokens = "tokens.txt";
 	config.model_config.encoder_param = "encoder_jit_trace-pnnx.ncnn.param";
@@ -614,10 +616,10 @@ int recognize_audio(const char * audio_file)
 
 	// simulate streaming
 
-#define N 3200  // 0.2 s. Sample rate is fixed to 16 kHz
+#define NumberSample 16000 * 50 / 1000  // 50ms. Sample rate is fixed to 16 kHz 
 
-	int16_t buffer[N];
-	float samples[N];
+	int16_t buffer[NumberSample];
+	float samples[NumberSample];
 
 	SherpaNcnnStream* s = CreateStream(recognizer);
 
@@ -625,7 +627,7 @@ int recognize_audio(const char * audio_file)
 	int32_t segment_id = -1;
 
 	while (!feof(fp)) {
-		size_t n = fread((void*)buffer, sizeof(int16_t), N, fp);
+		size_t n = fread((void*)buffer, sizeof(int16_t), NumberSample, fp);
 		if (n > 0) {
 			for (size_t i = 0; i != n; ++i) {
 				samples[i] = buffer[i] / 32768.;
@@ -672,19 +674,44 @@ int recognize_audio(const char * audio_file)
 
 int main()
 {
+	char ch;
+
+	cout << "Welcome to our Windows-ASR" << endl;
+	cout << "Press Any key to start recording ... " <<endl;
+
+	ch = getchar();
+
 	record_audio();
 
-	cout << "Recording Finished" << endl;
+	cout << "Recording Finished" << endl << endl;
 
-	reSampleRate_libsamplerate("recording.wav", "resample_out_libsamplrate.wav");
+	cout << "Please choose the resampling method" << endl;
+	cout << "LibSamplerate(1) LibSoxr(2) Windows Media Foundation(3)" << endl;
+	cout << "Please input the number : ";
+
+	ch = getchar();
 	
-	reSampleRate_libsoxr("recording.wav", "resample_out_libsoxr.wav");
+	switch (ch) {
+	case '1':
+		reSampleRate_libsamplerate("recording.wav", "resample_out.wav");
+		break;
+	case '2':
+		reSampleRate_libsoxr("recording.wav", "resample_out.wav");
+		break;
+	case '3':
+		reSampleRate_wmf(L"recording.wav", L"resample_out.wav");
+		break;
+	default:
+		cout << "Unkown method" << endl;
+		return 0;
+		break;
+	}
+	
+	cout << endl << "Thank you for your choose." << endl << endl;
 
-	reSampleRate_wmf(L"recording.wav", L"resample_out_wmf.wav");
+	recognize_audio("resample_out.wav");
 
-	recognize_audio("resample_out_libsoxr.wav");
-
-	getchar();
+	ch = getchar();
 
 	return 0;
 }
