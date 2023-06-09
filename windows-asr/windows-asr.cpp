@@ -24,12 +24,16 @@
 #include <mmreg.h>
 #include <dmo.h>
 #include <evr.h>
-#include <atlbase.h>
+//#include <atlbase.h>
+#include <Objbase.h>
 #include <assert.h>
 #include <stdint.h>
 #include <wmcodecdsp.h>
 #include "WWMFResampler.h"
 
+
+#pragma comment(lib, "Ole32.lib")
+#pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "mfplat.lib")
 #pragma comment(lib, "mfuuid.lib")
 #pragma comment(lib, "mfreadwrite.lib")
