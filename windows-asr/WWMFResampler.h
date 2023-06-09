@@ -64,7 +64,8 @@ struct WWMFSampleData {
     }
 
     ~WWMFSampleData(void) {
-        //assert(NULL == data);
+        if (data)
+            delete data;
     }
 
     void Release(void) {

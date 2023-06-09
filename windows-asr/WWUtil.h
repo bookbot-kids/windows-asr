@@ -1,3 +1,8 @@
+/*
+* Author:    Volkodav Anton
+* Date:      6/5/2023
+* Copyright: Booktbot
+*/
 
 #pragma once
 
