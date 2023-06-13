@@ -56,8 +56,8 @@ const int BLOCK_ALIGN = NUMBER_OF_CHANNELS * BIT_PER_SAMPLE / 8; // Block Align
 const int BYTE_PER_SECOND = SAMPLE_RATE * BLOCK_ALIGN;			 // Byte per Second
 //------------------------------------------------------------------------------------
 
-#define WAVBLOCK_SIZE  (int)(SAMPLE_RATE * BLOCK_ALIGN * 200 / 1000)  // 100ms. 
-#define SAMPLEBLOCK_SIZE  (int)(WAVBLOCK_SIZE * RESAMPLE_RATIO)	     // Data Block Size for Recognition 
+#define WAVBLOCK_SIZE      12800     // 200ms.  (int)(SAMPLE_RATE * BLOCK_ALIGN * 200 / 1000)
+#define SAMPLEBLOCK_SIZE    6400     // Data Block Size for Recognition  (int)(WAVBLOCK_SIZE * RESAMPLE_RATIO)	
 
 //---------------------------------- Structure ---------------------------------------
 typedef struct {
