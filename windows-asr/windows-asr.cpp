@@ -229,7 +229,7 @@ int InitializeRecognition()
 	return S_OK;
 }
 
-int Recognize (BYTE* sampledBytes, int nBytes)
+int Recognize (BYTE* sampledBytes, int nBytes, int index)
 {
 #define NumberSample 16000 * 200 / 1000  // 200ms. Sample rate is fixed to 16 kHz 
 
@@ -257,6 +257,7 @@ int Recognize (BYTE* sampledBytes, int nBytes)
 
 	SherpaNcnnResult* r = GetResult(recognizer, s);
 	if (strlen(r->text)) {
+		cout << "buffer index : " << index << "  ";
 		SherpaNcnnPrint(display, segment_id, r->text);
 	}
 	DestroyResult(r);
@@ -456,12 +457,13 @@ static void ProcessResampleRecogThread() {
 
 	while (recordingStatus) {
 
-		auto start = std::chrono::high_resolution_clock::now();
 		int maxWaveHdrListIndex = WaveHdrList.size() - 1;
 		if (curProcessIndex <= maxWaveHdrListIndex) {
+
 			// Process the current buffer
 			WAVEHDR* lastWaveHdr = WaveHdrList[curProcessIndex];
 			if (lastWaveHdr->dwBytesRecorded != 0) {
+				auto start = std::chrono::high_resolution_clock::now();
 
 				BYTE SampleBlock[SAMPLEBLOCK_SIZE];
 				int sampleCount;
@@ -477,7 +479,7 @@ static void ProcessResampleRecogThread() {
 				{
 					//cout << "Recorded = " << lastWaveHdr->dwBytesRecorded << " Resampled bytes = " << sampleCount << endl;
 
-					hr = Recognize(SampleBlock, sampleCount);
+					hr = Recognize(SampleBlock, sampleCount, curProcessIndex);
 					if (hr != S_OK)
 					{
 						cout << "Recognition failed " << endl;
