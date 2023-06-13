@@ -8,7 +8,6 @@
 #include <iostream>
 #include <windows.h>
 #include <mmsystem.h>
-#include <iostream>
 #include <fstream>
 #include <stdio.h>
 #include <conio.h>
@@ -30,6 +29,9 @@
 #include <wmcodecdsp.h>
 #include <chrono>
 #include <thread>
+#include <ctime>
+#include <sstream>
+#include <iomanip>
 
 #include "WWMFResampler.h"
 
@@ -54,8 +56,8 @@ const int BLOCK_ALIGN = NUMBER_OF_CHANNELS * BIT_PER_SAMPLE / 8; // Block Align
 const int BYTE_PER_SECOND = SAMPLE_RATE * BLOCK_ALIGN;			 // Byte per Second
 //------------------------------------------------------------------------------------
 
-#define WAVBLOCK_SIZE  (int)(SAMPLE_RATE * BLOCK_ALIGN * 50 / 1000)  // 50ms. 
-#define SAMPLEBLOCK_SIZE  (int)(WAVBLOCK_SIZE * RESAMPLE_RATIO)	      // Data Block Size for Recognition 
+#define WAVBLOCK_SIZE  (int)(SAMPLE_RATE * BLOCK_ALIGN * 200 / 1000)  // 100ms. 
+#define SAMPLEBLOCK_SIZE  (int)(WAVBLOCK_SIZE * RESAMPLE_RATIO)	     // Data Block Size for Recognition 
 
 //---------------------------------- Structure ---------------------------------------
 typedef struct {
@@ -74,7 +76,6 @@ typedef struct {
 	DWORD pcmbytes;
 } WAVHEADER;
 //-------------------------------------------------------------------------------------
-
 
 
 WWMFResampler iResampler;
@@ -223,14 +224,14 @@ int InitializeRecognition()
 
 	recognizer = CreateRecognizer(&config);
 	s = CreateStream(recognizer);
-	display = CreateDisplay(50);
+	display = CreateDisplay(1000);
 
 	return S_OK;
 }
 
 int Recognize (BYTE* sampledBytes, int nBytes)
 {
-#define NumberSample 16000 * 50 / 1000  // 50ms. Sample rate is fixed to 16 kHz 
+#define NumberSample 16000 * 200 / 1000  // 200ms. Sample rate is fixed to 16 kHz 
 
 	float samples[NumberSample];
 
@@ -244,7 +245,7 @@ int Recognize (BYTE* sampledBytes, int nBytes)
 	}
 
 	AcceptWaveform(s, 16000, samples, nSamples);
-	cout << "nSamples " << nSamples << endl;
+	//cout << "nSamples " << nSamples << endl;
 	
 	//for (int i = 0; i < 10; i++)
 	//	cout << samples[i] << " ";
@@ -378,7 +379,7 @@ int StartRecording()
 int StopRecording()
 {
 	// Stop recording
-	cout << "Stop Recording" << endl;
+	cout << "Stop recording and save to file" << endl;
 	recordingStatus = 0;
 
 	if (waveInStop(hWaveIn) != MMSYSERR_NOERROR)
@@ -442,6 +443,17 @@ int curProcessIndex = 0;
 
 static void ProcessResampleRecogThread() {
 	
+	time_t now = time(nullptr); // Get current time
+	tm timeinfo;
+	localtime_s(&timeinfo, &now); // Convert time to struct tm
+	stringstream filename; // Create stringstream to build filename
+	filename << "file_" << setfill('0') << setw(2) << timeinfo.tm_hour << "-"
+		<< setfill('0') << setw(2) << timeinfo.tm_min << "-"
+		<< setfill('0') << setw(2) << timeinfo.tm_sec << ".csv";
+	ofstream outfile(filename.str()); // Open file for writing
+
+	outfile << "CurProcessingBufferIndex, CurRecordingBurfferIndex, ProcessingTime(ms)" << endl;
+
 	while (recordingStatus) {
 
 		auto start = std::chrono::high_resolution_clock::now();
@@ -450,8 +462,10 @@ static void ProcessResampleRecogThread() {
 			// Process the current buffer
 			WAVEHDR* lastWaveHdr = WaveHdrList[curProcessIndex];
 			if (lastWaveHdr->dwBytesRecorded != 0) {
+
 				BYTE SampleBlock[SAMPLEBLOCK_SIZE];
 				int sampleCount;
+
 				HRESULT hr;
 				//cout << "Processing " << curProcessIndex << " Buffer index " << lastWaveHdr->dwBytesRecorded << endl;
 				hr = Resample((BYTE*)lastWaveHdr->lpData, lastWaveHdr->dwBytesRecorded, SampleBlock, &sampleCount);
@@ -461,7 +475,7 @@ static void ProcessResampleRecogThread() {
 				}
 				else
 				{
-					cout << "Recorded = " << lastWaveHdr->dwBytesRecorded << " Resampled bytes = " << sampleCount << endl;
+					//cout << "Recorded = " << lastWaveHdr->dwBytesRecorded << " Resampled bytes = " << sampleCount << endl;
 
 					hr = Recognize(SampleBlock, sampleCount);
 					if (hr != S_OK)
@@ -470,17 +484,22 @@ static void ProcessResampleRecogThread() {
 					}
 
 				}
-				curProcessIndex++;
+
+				//std::cout << "curProcessIndex is " << curProcessIndex << "and recorded buffer index is " << WaveHdrList.size() - 1 << std::endl;
 
 				auto end = std::chrono::high_resolution_clock::now();
 				auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
+				//cout << "Current Recording Buffer Index is " << WaveHdrList.size() - 1 << " and Cur Process Index is " << curProcessIndex << " processingTime is " << duration.count() << " ms" << endl;
 				//std::cout << "Time taken by the operation: " << duration.count() << " microseconds" << endl;
+				outfile << curProcessIndex << ", " << WaveHdrList.size() - 1 <<", " << duration.count() << endl;
+				curProcessIndex++;
 			}
-		}
-
-		this_thread::sleep_for(chrono::milliseconds(100));
+		} else
+			this_thread::sleep_for(chrono::milliseconds(1));
 	}
+
+	outfile.close();
 }
 
 int main()
@@ -500,7 +519,9 @@ int main()
 	thread processSampleRecogThread(ProcessResampleRecogThread);
 	
 	// Wait for user input to stop recording
-	std::cout << "Recording... Press any key to stop" << std::endl;
+	std::cout << "Recording and Recognizing ... wait for a second..." << endl;
+	cout << "Press any key to stop" << std::endl;
+
 	std::cin.get();
 
 	StopRecording();
