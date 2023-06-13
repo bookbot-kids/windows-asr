@@ -207,17 +207,17 @@ int InitializeRecognition()
 	config.model_config.num_threads = num_threads;
 	config.model_config.use_vulkan_compute = 0;
 
-	config.decoder_config.decoding_method = "greedy_search";
+	config.decoder_config.decoding_method = "modified_beam_search"; //   greedy_search
 
 	//if (argc == 11) {
 	//	config.decoder_config.decoding_method = argv[10];
 	//}
 
 	config.decoder_config.num_active_paths = 4;
-	config.enable_endpoint = 1; // 0
-	config.rule1_min_trailing_silence = 2.0; // 2.4
-	config.rule2_min_trailing_silence = 0.8; // 1.2
-	config.rule3_min_utterance_length = 20; // 300
+	config.enable_endpoint = 0; // 0
+	config.rule1_min_trailing_silence = 2.4; // 2.0
+	config.rule2_min_trailing_silence = 1.2; // 0.8
+	config.rule3_min_utterance_length = 300; // 20
 
 	config.feat_config.sampling_rate = 16000.0;
 	config.feat_config.feature_dim = 80;
@@ -458,7 +458,7 @@ static void ProcessResampleRecogThread() {
 	while (recordingStatus) {
 
 		int maxWaveHdrListIndex = WaveHdrList.size() - 1;
-		if (curProcessIndex <= maxWaveHdrListIndex) {
+		if (curProcessIndex < maxWaveHdrListIndex) {
 
 			// Process the current buffer
 			WAVEHDR* lastWaveHdr = WaveHdrList[curProcessIndex];
@@ -478,13 +478,13 @@ static void ProcessResampleRecogThread() {
 				else
 				{
 					//cout << "Recorded = " << lastWaveHdr->dwBytesRecorded << " Resampled bytes = " << sampleCount << endl;
-
-					hr = Recognize(SampleBlock, sampleCount, curProcessIndex);
-					if (hr != S_OK)
-					{
-						cout << "Recognition failed " << endl;
-					}
-
+					//if (sampleCount == 6400) {
+						hr = Recognize(SampleBlock, sampleCount, curProcessIndex);
+						if (hr != S_OK)
+						{
+							cout << "Recognition failed " << endl;
+						}
+					//}
 				}
 
 				//std::cout << "curProcessIndex is " << curProcessIndex << "and recorded buffer index is " << WaveHdrList.size() - 1 << std::endl;
@@ -494,7 +494,7 @@ static void ProcessResampleRecogThread() {
 
 				//cout << "Current Recording Buffer Index is " << WaveHdrList.size() - 1 << " and Cur Process Index is " << curProcessIndex << " processingTime is " << duration.count() << " ms" << endl;
 				//std::cout <<"index "<< curProcessIndex << "  Time taken by the operation: " << duration.count() << " microseconds" << endl;
-				outfile << curProcessIndex << ", " << WaveHdrList.size() - 1 <<", " << duration.count() << endl;
+				//outfile << curProcessIndex << ", " << WaveHdrList.size() - 1 <<", " << duration.count() << endl;
 				curProcessIndex++;
 			}
 		} else
