@@ -186,6 +186,7 @@ int FinializeResample()
 SherpaNcnnRecognizer* recognizer;
 SherpaNcnnStream* s;
 SherpaNcnnDisplay* display;
+ofstream outputPhoneme;
 
 int InitializeRecognition()
 {
@@ -207,7 +208,7 @@ int InitializeRecognition()
 	config.model_config.num_threads = num_threads;
 	config.model_config.use_vulkan_compute = 0;
 
-	config.decoder_config.decoding_method = "modified_beam_search"; //   greedy_search
+	config.decoder_config.decoding_method = "modified_beam_search"; // greedy_search
 
 	//if (argc == 11) {
 	//	config.decoder_config.decoding_method = argv[10];
@@ -259,6 +260,7 @@ int Recognize (BYTE* sampledBytes, int nBytes, int index)
 	if (strlen(r->text)) {
 		cout << "buffer index : " << index << "  ";
 		SherpaNcnnPrint(display, segment_id, r->text);
+		outputPhoneme << r->text << endl;
 	}
 	DestroyResult(r);
 
@@ -448,10 +450,14 @@ static void ProcessResampleRecogThread() {
 	tm timeinfo;
 	localtime_s(&timeinfo, &now); // Convert time to struct tm
 	stringstream filename; // Create stringstream to build filename
+	
+
 	filename << "file_" << setfill('0') << setw(2) << timeinfo.tm_hour << "-"
 		<< setfill('0') << setw(2) << timeinfo.tm_min << "-"
 		<< setfill('0') << setw(2) << timeinfo.tm_sec << ".csv";
 	ofstream outfile(filename.str()); // Open file for writing
+
+	outputPhoneme.open("output_phoneme.txt", ios::trunc); // open the file for writing
 
 	outfile << "CurProcessingBufferIndex, CurRecordingBurfferIndex, ProcessingTime(microsecond)" << endl;
 
@@ -494,7 +500,7 @@ static void ProcessResampleRecogThread() {
 
 				//cout << "Current Recording Buffer Index is " << WaveHdrList.size() - 1 << " and Cur Process Index is " << curProcessIndex << " processingTime is " << duration.count() << " ms" << endl;
 				//std::cout <<"index "<< curProcessIndex << "  Time taken by the operation: " << duration.count() << " microseconds" << endl;
-				//outfile << curProcessIndex << ", " << WaveHdrList.size() - 1 <<", " << duration.count() << endl;
+				outfile << curProcessIndex << ", " << WaveHdrList.size() - 1 <<", " << duration.count() << endl;
 				curProcessIndex++;
 			}
 		} else
@@ -502,6 +508,7 @@ static void ProcessResampleRecogThread() {
 	}
 
 	outfile.close();
+	outputPhoneme.close();
 }
 
 int main()
