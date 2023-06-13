@@ -24,13 +24,14 @@
 #include <mmreg.h>
 #include <dmo.h>
 #include <evr.h>
-//#include <atlbase.h>
 #include <Objbase.h>
 #include <assert.h>
 #include <stdint.h>
 #include <wmcodecdsp.h>
-#include "WWMFResampler.h"
+#include <chrono>
+#include <thread>
 
+#include "WWMFResampler.h"
 
 #pragma comment(lib, "Ole32.lib")
 #pragma comment(lib, "winmm.lib")
@@ -53,9 +54,8 @@ const int BLOCK_ALIGN = NUMBER_OF_CHANNELS * BIT_PER_SAMPLE / 8; // Block Align
 const int BYTE_PER_SECOND = SAMPLE_RATE * BLOCK_ALIGN;			 // Byte per Second
 //------------------------------------------------------------------------------------
 
-#define WAVBLOCK_SIZE  (int)(SAMPLE_RATE * 50 / 1000)					 // 50ms. 
-#define SAMPLEBLOCK_SIZE  (int)(WAVBLOCK_SIZE * RESAMPLE_RATIO)				 // Data Block Size for Recognition 
-
+#define WAVBLOCK_SIZE  (int)(SAMPLE_RATE * 100 / 1000)			 // 100ms. 
+#define SAMPLEBLOCK_SIZE  (int)(WAVBLOCK_SIZE * RESAMPLE_RATIO)	 // Data Block Size for Recognition 
 
 //---------------------------------- Structure ---------------------------------------
 typedef struct {
@@ -76,10 +76,10 @@ typedef struct {
 //-------------------------------------------------------------------------------------
 
 
+
 WWMFResampler iResampler;
 IMFMediaType* pInputType = NULL;
 IMFMediaType* pOutputType = NULL;
-
 
 int InitializeResample()
 {
@@ -93,14 +93,14 @@ int InitializeResample()
 
 	// Setup Input Media Type 
 	hr = MFCreateMediaType(&pInputType);
-	hr = pOutputType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
-	hr = pOutputType->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM);
-	hr = pOutputType->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, NUMBER_OF_CHANNELS);
-	hr = pOutputType->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, SAMPLE_RATE);
-	hr = pOutputType->SetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, BLOCK_ALIGN);
-	hr = pOutputType->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, BYTE_PER_SECOND);
-	hr = pOutputType->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, BIT_PER_SAMPLE);
-	hr = pOutputType->SetUINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, TRUE);
+	hr = pInputType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
+	hr = pInputType->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM);
+	hr = pInputType->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, NUMBER_OF_CHANNELS);
+	hr = pInputType->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, SAMPLE_RATE);
+	hr = pInputType->SetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, BLOCK_ALIGN);
+	hr = pInputType->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, BYTE_PER_SECOND);
+	hr = pInputType->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, BIT_PER_SAMPLE);
+	hr = pInputType->SetUINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, TRUE);
 
 	// Setup Output Media Type
 	hr = MFCreateMediaType(&pOutputType);
@@ -134,20 +134,20 @@ int InitializeResample()
 	{
 		cout << "Initialize OK" << endl;
 		return S_OK;
-	} 
-	else 
+	}
+	else
 	{
 		cout << "Initialize Failed" << endl;
 		return S_FALSE;
 	}
-
 }
 
-int Resample(BYTE * Block, int nBytes, BYTE * SampleBlock, int * nSampleBytes)
+int Resample(BYTE* Block, int nBytes, BYTE* SampleBlock, int* nSampleBytes)
 {
 	if (Block == NULL || SampleBlock == NULL || nSampleBytes == NULL)
 		return S_FALSE;
 
+	cout << "Resampling the buffer" << endl;
 	HRESULT hr;
 	WWMFSampleData sampleData_return;
 	hr = iResampler.Resample(Block, nBytes, &sampleData_return);
@@ -177,161 +177,10 @@ int FinializeResample()
 
 	MFShutdown();
 	CoUninitialize();
-	
+
 	return S_OK;
 }
 
-
-WAVEHDR * WaveHdr = NULL;
-HWAVEIN hWaveIn;
-int index = 0;
-
-void CALLBACK waveInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2)
-{
-	if (uMsg == WIM_DATA)
-	{
-		// Send the buffer back to the device
-
-		WAVEHDR  * newWaveHdr = new WAVEHDR;
-		memset(newWaveHdr, 0, sizeof(WAVEHDR));
-
-		char* buffer = new char[WAVBLOCK_SIZE];
-		newWaveHdr->lpData = (LPSTR)buffer;
-		newWaveHdr->dwBufferLength = WAVBLOCK_SIZE * NUMBER_OF_CHANNELS;
-		newWaveHdr->dwBytesRecorded = 0;
-		newWaveHdr->dwUser = 0L;
-		newWaveHdr->dwFlags = 0L;
-		newWaveHdr->dwLoops = 0L;
-
-		WaveHdr->lpNext = newWaveHdr;
-
-		MMRESULT hr1, hr2;
-		hr1 = waveInPrepareHeader(hWaveIn, newWaveHdr, sizeof(WAVEHDR));
-		hr2 = waveInAddBuffer(hWaveIn, newWaveHdr, sizeof(WAVEHDR));
-
-		cout << "index = " << index << " Recorded = " << WaveHdr->dwBytesRecorded << " prepare " << hr1 << " inaddbuffer " << hr2 << endl;
-
-		//cout << "index = " << index << " Recorded = " << WaveHdr->dwBytesRecorded << endl;
-
-
-		index++;
-	}
-}
-int StartRecording()
-{
-
-	// Configure wave format
-	WAVEFORMATEX wfex;
-	wfex.wFormatTag = FORMAT_TAG;
-	wfex.nChannels = NUMBER_OF_CHANNELS;
-	wfex.wBitsPerSample = BIT_PER_SAMPLE;
-	wfex.nSamplesPerSec = SAMPLE_RATE;
-	wfex.nAvgBytesPerSec = SAMPLE_RATE * wfex.nChannels * wfex.wBitsPerSample / 8;
-	wfex.nBlockAlign = wfex.nChannels * wfex.wBitsPerSample / 8;
-	wfex.cbSize = 0;
-
-	// Open audio device
-	if (waveInOpen(&hWaveIn, WAVE_MAPPER, &wfex, (DWORD_PTR)waveInProc, 0L, CALLBACK_FUNCTION) != MMSYSERR_NOERROR)
-	{
-		cout << "Error opening audio device!" << endl;
-		return -1;
-	}
-
-	// Initialize audio header
-
-	char * buffer = new char [WAVBLOCK_SIZE];
-
-	WaveHdr = new WAVEHDR;
-	WaveHdr->lpData = (LPSTR)buffer;
-	WaveHdr->dwBufferLength = WAVBLOCK_SIZE * NUMBER_OF_CHANNELS;
-	WaveHdr->dwBytesRecorded = 0;
-	WaveHdr->dwUser = 0L;
-	WaveHdr->dwFlags = 0L;
-	WaveHdr->dwLoops = 0L;
-
-	// Prepare audio header
-	if (waveInPrepareHeader(hWaveIn, WaveHdr, sizeof(WAVEHDR)) != MMSYSERR_NOERROR)
-	{
-		cout << "Error preparing audio header!" << endl;
-		return -1;
-	}
-
-	// Add audio header to queue
-	if (waveInAddBuffer(hWaveIn, WaveHdr, sizeof(WAVEHDR)) != MMSYSERR_NOERROR)
-	{
-		cout << "Error adding audio header to queue!" << endl;
-		return -1;
-	}
-
-	// Start recording
-	if (waveInStart(hWaveIn) != MMSYSERR_NOERROR)
-	{
-		cout << "Error starting audio recording!" << endl;
-		return -1;
-	}
-
-	// Wait for user input to stop recording
-	std::cout << "Recording... Press any key to stop" << std::endl;
-	std::cin.get();
-
-	// Stop recording
-	if (waveInStop(hWaveIn) != MMSYSERR_NOERROR)
-	{
-		std::cout << "Failed to stop recording" << std::endl;
-		return 1;
-	}
-
-	index = 0;
-	for (WAVEHDR* tempWaveHdr = WaveHdr; tempWaveHdr != NULL; tempWaveHdr = tempWaveHdr->lpNext, index ++)
-	{
-		MMRESULT hr;
-		cout << "UnprepareHeader index = " << index << endl;
-		hr = waveInUnprepareHeader(hWaveIn, tempWaveHdr, sizeof(WAVEHDR));
-		if (hr != MMSYSERR_NOERROR)
-		{
-			std::cout << "Failed to unprepareHeader " << hr << std::endl;
-			return 1;
-		}
-	}
-
-	// Close audio device
-	if (waveInClose(hWaveIn) != MMSYSERR_NOERROR)
-	{
-		cout << "Error closing audio device!" << endl;
-		return 1;
-	}
-
-	// Format audio header
-	WAVHEADER wh;
-	memcpy(wh.RIFF, "RIFF", 4);
-	memcpy(wh.WAVE, "WAVE", 4);
-	memcpy(wh.fmt, "fmt ", 4);
-	memcpy(wh.data, "data", 4);
-
-	wh.siz_wf = BIT_PER_SAMPLE;
-	wh.wFormatTag = WAVE_FORMAT_PCM;
-	wh.nChannels = wfex.nChannels;
-	wh.wBitsPerSample = wfex.wBitsPerSample;
-	wh.nSamplesPerSec = SAMPLE_RATE;
-	wh.nAvgBytesPerSec = SAMPLE_RATE * wh.nChannels * wh.wBitsPerSample / 8;
-	wh.nBlockAlign = wh.nChannels * wh.wBitsPerSample / 8;
-	wh.pcmbytes = index * WAVBLOCK_SIZE;
-	wh.bytes = wh.pcmbytes + 36;
-
-	// Save audio file
-	HANDLE hFile = CreateFileW(L"recording.wav", GENERIC_WRITE, FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (hFile)
-	{
-		DWORD dwWrite;
-		WriteFile(hFile, &wh, sizeof(WAVHEADER), &dwWrite, NULL);
-		for (WAVEHDR* tempWaveHdr = WaveHdr; tempWaveHdr != NULL; tempWaveHdr = tempWaveHdr->lpNext)
-		{
-			WriteFile(hFile, tempWaveHdr->lpData, tempWaveHdr->dwBufferLength, &dwWrite, NULL);
-		}
-		CloseHandle(hFile);
-	}
-	return 0;
-}
 
 SherpaNcnnRecognizer* recognizer;
 SherpaNcnnStream* s;
@@ -339,7 +188,7 @@ SherpaNcnnDisplay* display;
 
 int InitializeRecognition()
 {
-	cout << "Recognizing audio..." << endl;
+	cout << "Initializing Recognition audio library" << endl;
 
 	SherpaNcnnRecognizerConfig config;
 	config.model_config.tokens = "tokens.txt";
@@ -379,18 +228,22 @@ int InitializeRecognition()
 	return S_OK;
 }
 
-int Recognize(BYTE * sampledBytes, int nBytes)
+int Recognize (BYTE* sampledBytes, int nBytes)
 {
-	float samples[SAMPLEBLOCK_SIZE];
+#define NumberSample 16000 * 50 / 1000  // 50ms. Sample rate is fixed to 16 kHz 
 
-	
+	float samples[NumberSample];
+
+	cout << " Recognize audio" << endl;
+
 	int32_t segment_id = -1;
+	int nSamples = 0;
 
-	for (int i = 0; i != nBytes; ++i) {
-		samples[i] = sampledBytes[i] / 32768.;
+	for (int i = 0; i < nBytes - 1 ; i += 2, nSamples ++ ) {
+		samples[nSamples] = ((sampledBytes[i + 1] << 8) + sampledBytes[i]) / 32768.;
 	}
 
-	AcceptWaveform(s, 16000, samples, nBytes);
+	AcceptWaveform(s, 16000, samples, nSamples);
 	while (IsReady(recognizer, s)) {
 		Decode(recognizer, s);
 	}
@@ -400,7 +253,7 @@ int Recognize(BYTE * sampledBytes, int nBytes)
 		SherpaNcnnPrint(display, segment_id, r->text);
 	}
 	DestroyResult(r);
-		
+
 #if 0
 	// add some tail padding
 	float tail_paddings[4800] = { 0 };  // 0.3 seconds at 16 kHz sample rate
@@ -428,21 +281,226 @@ int FinializeRecognition()
 	return S_OK;
 }
 
+vector < WAVEHDR*> WaveHdrList;
+HWAVEIN hWaveIn;
+int recordingStatus = 0;
+
+void CALLBACK waveInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2)
+{
+	if (uMsg == WIM_DATA && recordingStatus == 1)
+	{
+
+		// Send the buffer back to the device
+		WAVEHDR* WaveHdr = new WAVEHDR;
+		BYTE* buffer = new BYTE[WAVBLOCK_SIZE];
+
+		WaveHdr->lpData = (LPSTR)buffer;
+		WaveHdr->dwBufferLength = WAVBLOCK_SIZE * NUMBER_OF_CHANNELS;
+		WaveHdr->dwBytesRecorded = 0;
+		WaveHdr->dwUser = 0L;
+		WaveHdr->dwFlags = 0L;
+		WaveHdr->dwLoops = 0L;
+
+		waveInPrepareHeader(hWaveIn, WaveHdr, sizeof(WAVEHDR));
+		waveInAddBuffer(hWaveIn, WaveHdr, sizeof(WAVEHDR));
+
+		// Insert the WaveHeader to list
+		WaveHdrList.push_back(WaveHdr);
+	}
+}
+
+
+int StartRecording()
+{
+	// Configure wave format
+	WAVEFORMATEX wfex;
+	wfex.wFormatTag = FORMAT_TAG;
+	wfex.nChannels = NUMBER_OF_CHANNELS;
+	wfex.wBitsPerSample = BIT_PER_SAMPLE;
+	wfex.nSamplesPerSec = SAMPLE_RATE;
+	wfex.nAvgBytesPerSec = SAMPLE_RATE * wfex.nChannels * wfex.wBitsPerSample / 8;
+	wfex.nBlockAlign = wfex.nChannels * wfex.wBitsPerSample / 8;
+	wfex.cbSize = 0;
+
+	// Open audio device
+	if (waveInOpen(&hWaveIn, WAVE_MAPPER, &wfex, (DWORD_PTR)waveInProc, 0L, CALLBACK_FUNCTION) != MMSYSERR_NOERROR)
+	{
+		cout << "Error opening audio device!" << endl;
+		return -1;
+	}
+
+	// Initialize audio header
+
+	WAVEHDR* WaveHdr = new WAVEHDR;
+	BYTE* buffer = new BYTE[WAVBLOCK_SIZE];
+
+	WaveHdr->lpData = (LPSTR)buffer;
+	WaveHdr->dwBufferLength = WAVBLOCK_SIZE * NUMBER_OF_CHANNELS;
+	WaveHdr->dwBytesRecorded = 0;
+	WaveHdr->dwUser = 0L;
+	WaveHdr->dwFlags = 0L;
+	WaveHdr->dwLoops = 0L;
+
+	// Prepare audio header
+	if (waveInPrepareHeader(hWaveIn, WaveHdr, sizeof(WAVEHDR)) != MMSYSERR_NOERROR)
+	{
+		cout << "Error preparing audio header!" << endl;
+		return -1;
+	}
+
+	// Add audio header to queue
+	if (waveInAddBuffer(hWaveIn, WaveHdr, sizeof(WAVEHDR)) != MMSYSERR_NOERROR)
+	{
+		cout << "Error adding audio header to queue!" << endl;
+		return -1;
+	}
+
+	WaveHdrList.push_back(WaveHdr);
+
+	recordingStatus = 1;
+
+	// Start recording
+	if (waveInStart(hWaveIn) != MMSYSERR_NOERROR)
+	{
+		cout << "Error starting audio recording!" << endl;
+		return -1;
+	}
+
+	return S_OK;
+}
+
+int StopRecording()
+{
+	// Stop recording
+	cout << "Stop Recording" << endl;
+	recordingStatus = 0;
+
+	if (waveInStop(hWaveIn) != MMSYSERR_NOERROR)
+	{
+		std::cout << "Failed to stop recording" << std::endl;
+		return 1;
+	}
+
+	for (int i = 0; i < WaveHdrList.size(); i++)
+	{
+		MMRESULT hr;
+		cout << "UnprepareHeader index = " << i << endl;
+		hr = waveInUnprepareHeader(hWaveIn, WaveHdrList[i], sizeof(WAVEHDR));
+		if (hr != MMSYSERR_NOERROR)
+		{
+			std::cout << "Failed to unprepareHeader " << hr << std::endl;
+		}
+	}
+
+	// Close audio device
+	if (waveInClose(hWaveIn) != MMSYSERR_NOERROR)
+	{
+		cout << "Error closing audio device!" << endl;
+		//return 1;
+	}
+
+	// Format audio header
+	WAVHEADER wh;
+	memcpy(wh.RIFF, "RIFF", 4);
+	memcpy(wh.WAVE, "WAVE", 4);
+	memcpy(wh.fmt, "fmt ", 4);
+	memcpy(wh.data, "data", 4);
+
+	wh.siz_wf = BIT_PER_SAMPLE;
+	wh.wFormatTag = WAVE_FORMAT_PCM;
+	wh.nChannels = NUMBER_OF_CHANNELS;
+	wh.wBitsPerSample = BIT_PER_SAMPLE;
+	wh.nSamplesPerSec = SAMPLE_RATE;
+	wh.nAvgBytesPerSec = BYTE_PER_SECOND;
+	wh.nBlockAlign = BLOCK_ALIGN;
+
+	wh.pcmbytes = WaveHdrList.size() * WAVBLOCK_SIZE;
+	wh.bytes = wh.pcmbytes + 36;
+
+	// Save audio file
+	HANDLE hFile = CreateFileW(L"recording.wav", GENERIC_WRITE, FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (hFile)
+	{
+		DWORD dwWrite;
+		WriteFile(hFile, &wh, sizeof(WAVHEADER), &dwWrite, NULL);
+		for (int i = 0; i < WaveHdrList.size(); i++)
+		{
+			WriteFile(hFile, WaveHdrList[i]->lpData, WaveHdrList[i]->dwBufferLength, &dwWrite, NULL);
+		}
+		CloseHandle(hFile);
+	}
+	return S_OK;
+}
+
+int curProcessIndex = 0;
+
+static void ProcessResampleRecogThread() {
+	
+	while (recordingStatus) {
+
+		auto start = std::chrono::high_resolution_clock::now();
+		int maxWaveHdrListIndex = WaveHdrList.size() - 1;
+		if (curProcessIndex <= maxWaveHdrListIndex) {
+			// Process the current buffer
+			WAVEHDR* lastWaveHdr = WaveHdrList[curProcessIndex];
+
+			BYTE SampleBlock[SAMPLEBLOCK_SIZE];
+			int sampleCount;
+			HRESULT hr;
+			cout << "Processing " << curProcessIndex << "Buffer index " << lastWaveHdr->dwBytesRecorded << endl;
+			hr = Resample((BYTE*)lastWaveHdr->lpData, lastWaveHdr->dwBytesRecorded, SampleBlock, &sampleCount);
+			if (hr != S_OK)
+			{
+				cout << "Resample failed" << endl;
+			}
+			else
+			{
+				cout << "Recorded = " << lastWaveHdr->dwBytesRecorded << " Resampled bytes = " << sampleCount << endl;
+
+				hr = Recognize(SampleBlock, sampleCount);
+				if (hr != S_OK)
+				{
+					cout << "Recognition failed " << endl;
+				}
+
+			}
+			curProcessIndex ++;
+
+			auto end = std::chrono::high_resolution_clock::now();
+			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+			std::cout << "Time taken by the operation: " << duration.count() << " microseconds" << endl;
+		}
+
+		this_thread::sleep_for(chrono::milliseconds(100));
+	}
+}
+
 int main()
 {
 	char ch;
 
 	cout << "Welcome to our Windows-ASR" << endl;
-	cout << "Press Any key to start recording ... " <<endl;
+
+	InitializeResample();
+	InitializeRecognition();
+
+	cout << "Press Any key to start recording ... " << endl;
 
 	ch = getchar();
 
 	StartRecording();
+	thread processSampleRecogThread(ProcessResampleRecogThread);
+	
+	// Wait for user input to stop recording
+	std::cout << "Recording... Press any key to stop" << std::endl;
+	std::cin.get();
+
+	StopRecording();
+
+	processSampleRecogThread.join();
 
 	cout << "Recording Finished" << endl << endl;
-
-	//recognize_audio("resample_out.wav");
-
 	ch = getchar();
 
 	return 0;
