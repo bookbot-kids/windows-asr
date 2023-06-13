@@ -453,7 +453,7 @@ static void ProcessResampleRecogThread() {
 		<< setfill('0') << setw(2) << timeinfo.tm_sec << ".csv";
 	ofstream outfile(filename.str()); // Open file for writing
 
-	outfile << "CurProcessingBufferIndex, CurRecordingBurfferIndex, ProcessingTime(ms)" << endl;
+	outfile << "CurProcessingBufferIndex, CurRecordingBurfferIndex, ProcessingTime(microsecond)" << endl;
 
 	while (recordingStatus) {
 
@@ -493,7 +493,7 @@ static void ProcessResampleRecogThread() {
 				auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
 				//cout << "Current Recording Buffer Index is " << WaveHdrList.size() - 1 << " and Cur Process Index is " << curProcessIndex << " processingTime is " << duration.count() << " ms" << endl;
-				//std::cout << "Time taken by the operation: " << duration.count() << " microseconds" << endl;
+				//std::cout <<"index "<< curProcessIndex << "  Time taken by the operation: " << duration.count() << " microseconds" << endl;
 				outfile << curProcessIndex << ", " << WaveHdrList.size() - 1 <<", " << duration.count() << endl;
 				curProcessIndex++;
 			}
