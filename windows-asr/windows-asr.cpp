@@ -54,8 +54,8 @@ const int BLOCK_ALIGN = NUMBER_OF_CHANNELS * BIT_PER_SAMPLE / 8; // Block Align
 const int BYTE_PER_SECOND = SAMPLE_RATE * BLOCK_ALIGN;			 // Byte per Second
 //------------------------------------------------------------------------------------
 
-#define WAVBLOCK_SIZE  (int)(SAMPLE_RATE * 100 / 1000)			 // 100ms. 
-#define SAMPLEBLOCK_SIZE  (int)(WAVBLOCK_SIZE * RESAMPLE_RATIO)	 // Data Block Size for Recognition 
+#define WAVBLOCK_SIZE  (int)(SAMPLE_RATE * BLOCK_ALIGN * 50 / 1000)  // 50ms. 
+#define SAMPLEBLOCK_SIZE  (int)(WAVBLOCK_SIZE * RESAMPLE_RATIO)	      // Data Block Size for Recognition 
 
 //---------------------------------- Structure ---------------------------------------
 typedef struct {
@@ -147,7 +147,7 @@ int Resample(BYTE* Block, int nBytes, BYTE* SampleBlock, int* nSampleBytes)
 	if (Block == NULL || SampleBlock == NULL || nSampleBytes == NULL)
 		return S_FALSE;
 
-	cout << "Resampling the buffer" << endl;
+	//cout << "Resampling the buffer" << endl;
 	HRESULT hr;
 	WWMFSampleData sampleData_return;
 	hr = iResampler.Resample(Block, nBytes, &sampleData_return);
@@ -213,12 +213,12 @@ int InitializeRecognition()
 	//}
 
 	config.decoder_config.num_active_paths = 4;
-	config.enable_endpoint = 0;
-	config.rule1_min_trailing_silence = 2.4;
-	config.rule2_min_trailing_silence = 1.2;
-	config.rule3_min_utterance_length = 300;
+	config.enable_endpoint = 1; // 0
+	config.rule1_min_trailing_silence = 2.0; // 2.4
+	config.rule2_min_trailing_silence = 0.8; // 1.2
+	config.rule3_min_utterance_length = 20; // 300
 
-	config.feat_config.sampling_rate = 16000;
+	config.feat_config.sampling_rate = 16000.0;
 	config.feat_config.feature_dim = 80;
 
 	recognizer = CreateRecognizer(&config);
@@ -234,7 +234,7 @@ int Recognize (BYTE* sampledBytes, int nBytes)
 
 	float samples[NumberSample];
 
-	cout << " Recognize audio" << endl;
+	//cout << " Recognize audio" << endl;
 
 	int32_t segment_id = -1;
 	int nSamples = 0;
@@ -244,6 +244,12 @@ int Recognize (BYTE* sampledBytes, int nBytes)
 	}
 
 	AcceptWaveform(s, 16000, samples, nSamples);
+	cout << "nSamples " << nSamples << endl;
+	
+	//for (int i = 0; i < 10; i++)
+	//	cout << samples[i] << " ";
+	//cout << endl;
+
 	while (IsReady(recognizer, s)) {
 		Decode(recognizer, s);
 	}
@@ -384,11 +390,11 @@ int StopRecording()
 	for (int i = 0; i < WaveHdrList.size(); i++)
 	{
 		MMRESULT hr;
-		cout << "UnprepareHeader index = " << i << endl;
+		//cout << "UnprepareHeader index = " << i << endl;
 		hr = waveInUnprepareHeader(hWaveIn, WaveHdrList[i], sizeof(WAVEHDR));
 		if (hr != MMSYSERR_NOERROR)
 		{
-			std::cout << "Failed to unprepareHeader " << hr << std::endl;
+			std::cout << "Failed to unprepareHeader " << hr << "index is " << i << std::endl;
 		}
 	}
 
@@ -443,33 +449,34 @@ static void ProcessResampleRecogThread() {
 		if (curProcessIndex <= maxWaveHdrListIndex) {
 			// Process the current buffer
 			WAVEHDR* lastWaveHdr = WaveHdrList[curProcessIndex];
-
-			BYTE SampleBlock[SAMPLEBLOCK_SIZE];
-			int sampleCount;
-			HRESULT hr;
-			cout << "Processing " << curProcessIndex << "Buffer index " << lastWaveHdr->dwBytesRecorded << endl;
-			hr = Resample((BYTE*)lastWaveHdr->lpData, lastWaveHdr->dwBytesRecorded, SampleBlock, &sampleCount);
-			if (hr != S_OK)
-			{
-				cout << "Resample failed" << endl;
-			}
-			else
-			{
-				cout << "Recorded = " << lastWaveHdr->dwBytesRecorded << " Resampled bytes = " << sampleCount << endl;
-
-				hr = Recognize(SampleBlock, sampleCount);
+			if (lastWaveHdr->dwBytesRecorded != 0) {
+				BYTE SampleBlock[SAMPLEBLOCK_SIZE];
+				int sampleCount;
+				HRESULT hr;
+				//cout << "Processing " << curProcessIndex << " Buffer index " << lastWaveHdr->dwBytesRecorded << endl;
+				hr = Resample((BYTE*)lastWaveHdr->lpData, lastWaveHdr->dwBytesRecorded, SampleBlock, &sampleCount);
 				if (hr != S_OK)
 				{
-					cout << "Recognition failed " << endl;
+					cout << "Resample failed" << endl;
 				}
+				else
+				{
+					cout << "Recorded = " << lastWaveHdr->dwBytesRecorded << " Resampled bytes = " << sampleCount << endl;
 
+					hr = Recognize(SampleBlock, sampleCount);
+					if (hr != S_OK)
+					{
+						cout << "Recognition failed " << endl;
+					}
+
+				}
+				curProcessIndex++;
+
+				auto end = std::chrono::high_resolution_clock::now();
+				auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+
+				//std::cout << "Time taken by the operation: " << duration.count() << " microseconds" << endl;
 			}
-			curProcessIndex ++;
-
-			auto end = std::chrono::high_resolution_clock::now();
-			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
-			std::cout << "Time taken by the operation: " << duration.count() << " microseconds" << endl;
 		}
 
 		this_thread::sleep_for(chrono::milliseconds(100));
