@@ -1,1 +1,10 @@
 .vs
+*.csv
+/x64
+/windows-asr/x64
+/windows-asr/asr_model
+/windows-asr/*.bin
+/windows-asr/*.param
+/windows-asr/*.wav
+/windows-asr/*.txt
+/windows-asr/*.exe

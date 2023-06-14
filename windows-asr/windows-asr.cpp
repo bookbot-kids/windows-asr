@@ -56,8 +56,8 @@ const int BLOCK_ALIGN = NUMBER_OF_CHANNELS * BIT_PER_SAMPLE / 8; // Block Align
 const int BYTE_PER_SECOND = SAMPLE_RATE * BLOCK_ALIGN;			 // Byte per Second
 //------------------------------------------------------------------------------------
 
-#define WAVBLOCK_SIZE      12800     // 200ms.  (int)(SAMPLE_RATE * BLOCK_ALIGN * 200 / 1000)
-#define SAMPLEBLOCK_SIZE    6400     // Data Block Size for Recognition  (int)(WAVBLOCK_SIZE * RESAMPLE_RATIO)	
+#define WAVBLOCK_SIZE      6400     // 100ms.  (int)(SAMPLE_RATE * BLOCK_ALIGN * 200 / 1000)
+#define SAMPLEBLOCK_SIZE    3200     // Data Block Size for Recognition  (int)(WAVBLOCK_SIZE * RESAMPLE_RATIO)	
 
 //---------------------------------- Structure ---------------------------------------
 typedef struct {
@@ -101,7 +101,8 @@ int InitializeResample()
 	hr = pInputType->SetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, BLOCK_ALIGN);
 	hr = pInputType->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, BYTE_PER_SECOND);
 	hr = pInputType->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, BIT_PER_SAMPLE);
-	hr = pInputType->SetUINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, TRUE);
+	hr = pInputType->SetUINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, FALSE);
+	hr = pInputType->SetUINT32(MF_MT_FIXED_SIZE_SAMPLES, TRUE);
 
 	// Setup Output Media Type
 	hr = MFCreateMediaType(&pOutputType);
@@ -112,7 +113,8 @@ int InitializeResample()
 	hr = pOutputType->SetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, BLOCK_ALIGN);
 	hr = pOutputType->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, BYTE_PER_SECOND);
 	hr = pOutputType->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, BIT_PER_SAMPLE);
-	hr = pOutputType->SetUINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, TRUE);
+	hr = pOutputType->SetUINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, FALSE);
+	hr = pInputType->SetUINT32(MF_MT_FIXED_SIZE_SAMPLES, TRUE);
 
 	// Setup the translation.
 	WWMFPcmFormat inputFormat;
@@ -208,14 +210,14 @@ int InitializeRecognition()
 	config.model_config.num_threads = num_threads;
 	config.model_config.use_vulkan_compute = 0;
 
-	config.decoder_config.decoding_method = "modified_beam_search"; // greedy_search
+	config.decoder_config.decoding_method = "greedy_search"; // greedy_search
 
 	//if (argc == 11) {
 	//	config.decoder_config.decoding_method = argv[10];
 	//}
 
 	config.decoder_config.num_active_paths = 4;
-	config.enable_endpoint = 0; // 0
+	config.enable_endpoint = 1; // 0
 	config.rule1_min_trailing_silence = 2.4; // 2.0
 	config.rule2_min_trailing_silence = 1.2; // 0.8
 	config.rule3_min_utterance_length = 300; // 20
@@ -230,9 +232,10 @@ int InitializeRecognition()
 	return S_OK;
 }
 
+std::string last_text;
 int Recognize (BYTE* sampledBytes, int nBytes, int index)
 {
-#define NumberSample 16000 * 200 / 1000  // 200ms. Sample rate is fixed to 16 kHz 
+#define NumberSample 16000 * 100 / 1000  // 200ms. Sample rate is fixed to 16 kHz 
 
 	float samples[NumberSample];
 
@@ -255,14 +258,17 @@ int Recognize (BYTE* sampledBytes, int nBytes, int index)
 	while (IsReady(recognizer, s)) {
 		Decode(recognizer, s);
 	}
+	
 
 	SherpaNcnnResult* r = GetResult(recognizer, s);
-	if (strlen(r->text)) {
+	if (strlen(r->text) && r->text != last_text) {
 		cout << "buffer index : " << index << "  ";
 		SherpaNcnnPrint(display, segment_id, r->text);
+		//++segment_id;
 		outputPhoneme << r->text << endl;
+		last_text = r->text;
 	}
-	DestroyResult(r);
+	//DestroyResult(r);
 
 #if 0
 	// add some tail padding
@@ -484,13 +490,13 @@ static void ProcessResampleRecogThread() {
 				else
 				{
 					//cout << "Recorded = " << lastWaveHdr->dwBytesRecorded << " Resampled bytes = " << sampleCount << endl;
-					//if (sampleCount == 6400) {
+					if (sampleCount == 3200) {
 						hr = Recognize(SampleBlock, sampleCount, curProcessIndex);
 						if (hr != S_OK)
 						{
 							cout << "Recognition failed " << endl;
 						}
-					//}
+					}
 				}
 
 				//std::cout << "curProcessIndex is " << curProcessIndex << "and recorded buffer index is " << WaveHdrList.size() - 1 << std::endl;
