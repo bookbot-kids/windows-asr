@@ -1,0 +1,2 @@
+#define SPEECHRECOGNIZER_API __declspec(dllexport)
+#define SPEECHRECOGNIZER_API __declspec(dllimport)
