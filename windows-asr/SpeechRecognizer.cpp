@@ -67,10 +67,16 @@ static void ProcessResampleRecogThread(SpeechRecognizer * speechRecognizer)
 
 static void CALLBACK RecoringWavInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2)
 {
-	
+
 	SpeechRecognizer* speechRecognizer = (SpeechRecognizer*)dwInstance;
 
-	if (uMsg == MM_WIM_DATA && speechRecognizer->getRecognizerStatus() == SpeechRecognizerListen)
+	if (uMsg == WIM_DATA) 
+	{
+		WAVEHDR* RecordedWaveHdr = (WAVEHDR*)dwParam1;
+		printf("callback buffer index is %d with recorded = %d\n", speechRecognizer->WaveHdrList.size() - 1, RecordedWaveHdr->dwBytesRecorded);
+	}
+
+	if (uMsg == WIM_DATA && speechRecognizer->getRecognizerStatus() == SpeechRecognizerListen)
 	{
 
 		// Create new buffer for recording
@@ -87,13 +93,8 @@ static void CALLBACK RecoringWavInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInsta
 		waveInPrepareHeader(speechRecognizer->hWaveIn, WaveHdr, sizeof(WAVEHDR));
 		waveInAddBuffer(speechRecognizer->hWaveIn, WaveHdr, sizeof(WAVEHDR));
 
-		// Insert the WaveHeader to list
-		//WAVEHDR* RecordedWaveHdr = (WAVEHDR*)dwParam1;
-		//speechRecognizer->WaveHdrList.push_back(RecordedWaveHdr);
-		
 		speechRecognizer->WaveHdrList.push_back(WaveHdr);
-
-		cout << "index = " << speechRecognizer->WaveHdrList.size() - 1 << endl;
+		printf("current WaveHdrList size is %d\n", speechRecognizer->WaveHdrList.size());
 	}
 }
 
@@ -283,6 +284,9 @@ SpeechRecognizer::stopListening()
 	memcpy(wh.fmt, "fmt ", 4);
 	memcpy(wh.data, "data", 4);
 
+	int totlRecordSize = 0;
+	for (int i = 0; i < WaveHdrList.size(); i++) totlRecordSize += WaveHdrList[i]->dwBytesRecorded;
+
 	wh.siz_wf = BIT_PER_SAMPLE;
 	wh.wFormatTag = WAVE_FORMAT_PCM;
 	wh.nChannels = NUMBER_OF_CHANNELS;
@@ -290,7 +294,7 @@ SpeechRecognizer::stopListening()
 	wh.nSamplesPerSec = SAMPLE_RATE;
 	wh.nAvgBytesPerSec = BYTE_PER_SECOND;
 	wh.nBlockAlign = BLOCK_ALIGN;
-	wh.pcmbytes = WaveHdrList.size() * WAVBLOCK_SIZE;
+	wh.pcmbytes = totlRecordSize;
 	wh.bytes = wh.pcmbytes + 36;
 
 	// Save audio file
@@ -301,7 +305,7 @@ SpeechRecognizer::stopListening()
 		WriteFile(hFile, &wh, sizeof(WavHeader), &dwWrite, NULL);
 		for (int i = 0; i < WaveHdrList.size(); i++)
 		{
-			WriteFile(hFile, WaveHdrList[i]->lpData, WaveHdrList[i]->dwBufferLength, &dwWrite, NULL);
+			WriteFile(hFile, WaveHdrList[i]->lpData, WaveHdrList[i]->dwBytesRecorded, &dwWrite, NULL);
 		}
 		CloseHandle(hFile);
 	}
@@ -309,16 +313,62 @@ SpeechRecognizer::stopListening()
 	return S_OK;
 }
 
-void
+HRESULT
 SpeechRecognizer::mute()
 {
+	if (recognizerStatus != SpeechRecognizerListen)
+	{
+		std::cout << "Please listen to audio first" << std::endl;
+		return S_OK;
+	}
 
+	recognizerStatus = SpeechRecognizerMute;
+
+	if (waveInStop(hWaveIn) != MMSYSERR_NOERROR)
+	{
+		std::cout << "Failed to mute" << std::endl;
+		return S_FALSE;
+	}
+
+	cout << "the status changed to Mute" << endl;
+
+	return S_OK;
 }
 
-void
+HRESULT
 SpeechRecognizer::unmute()
 {
+	if (recognizerStatus != SpeechRecognizerMute)
+	{
+		std::cout << "Please mute the audio first" << std::endl;
+		return S_OK;
+	}
 
+	recognizerStatus = SpeechRecognizerListen;
+
+	// Create new buffer for recording
+	WAVEHDR* WaveHdr = new WAVEHDR;
+	BYTE* buffer = new BYTE[WAVBLOCK_SIZE];
+
+	WaveHdr->lpData = (LPSTR)buffer;
+	WaveHdr->dwBufferLength = WAVBLOCK_SIZE * NUMBER_OF_CHANNELS;
+	WaveHdr->dwBytesRecorded = 0;
+	WaveHdr->dwUser = 0L;
+	WaveHdr->dwFlags = 0L;
+	WaveHdr->dwLoops = 0L;
+
+	waveInPrepareHeader(hWaveIn, WaveHdr, sizeof(WAVEHDR));
+	waveInAddBuffer(hWaveIn, WaveHdr, sizeof(WAVEHDR));
+
+	WaveHdrList.push_back(WaveHdr);
+
+	// Start listening
+	if (waveInStart(hWaveIn) != MMSYSERR_NOERROR)
+	{
+		cout << "Error to unmute!" << endl;
+		return S_FALSE;
+	}
+	return S_OK;
 }
 
 void
@@ -336,9 +386,9 @@ SpeechRecognizer::resetSpeech()
 }
 
 void
-SpeechRecognizer::flushSpeech(std::string speechText)
+SpeechRecognizer::flushSpeech(std::string speechText_s)
 {
-
+	speechText = speechText_s;
 }
 
 void

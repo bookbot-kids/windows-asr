@@ -54,10 +54,10 @@ public:
     HRESULT stopListening();
 
     // Pause listen
-    void mute();
+    HRESULT mute();
 
     // Resume listen
-    void unmute();
+    HRESULT unmute();
 
     // Setup microphone and ASR model
     HRESULT initialize(std::string recordingId); // set recordingId property

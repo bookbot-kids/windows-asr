@@ -49,7 +49,6 @@ int main()
 
 	cout << "Welcome to our Windows-ASR" << endl;
 
-
 	SpeechRecognizer recognizer;
 	recognizer.initialize("MyRecording1");
 		
@@ -58,9 +57,16 @@ int main()
 	ch = getchar();
 
 	recognizer.listen();
+	Sleep(2000);
+
+	recognizer.mute();
+	Sleep(1000);
+
+	recognizer.unmute();
+
 	cout << "Recording now ... press Any key to Stop recording" << endl;
-	
 	ch = getchar();
+
 	recognizer.stopListening();
 
 	return 0;
