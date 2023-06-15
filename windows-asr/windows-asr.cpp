@@ -52,7 +52,7 @@ int main()
 
 	SpeechRecognizer recognizer;
 	recognizer.initialize("MyRecording1");
-
+		
 
 	cout << "Press Any key to Start recording" << endl;
 	ch = getchar();

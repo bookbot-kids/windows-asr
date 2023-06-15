@@ -67,13 +67,11 @@ static void ProcessResampleRecogThread(SpeechRecognizer * speechRecognizer)
 
 static void CALLBACK RecoringWavInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2)
 {
+	
 	SpeechRecognizer* speechRecognizer = (SpeechRecognizer*)dwInstance;
 
 	if (uMsg == MM_WIM_DATA && speechRecognizer->getRecognizerStatus() == SpeechRecognizerListen)
 	{
-		// Insert the WaveHeader to list
-		WAVEHDR* RecordedWaveHdr = (WAVEHDR*)dwParam1;
-		speechRecognizer->WaveHdrList.push_back(RecordedWaveHdr);
 
 		// Create new buffer for recording
 		WAVEHDR* WaveHdr = new WAVEHDR;
@@ -89,7 +87,13 @@ static void CALLBACK RecoringWavInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInsta
 		waveInPrepareHeader(speechRecognizer->hWaveIn, WaveHdr, sizeof(WAVEHDR));
 		waveInAddBuffer(speechRecognizer->hWaveIn, WaveHdr, sizeof(WAVEHDR));
 
+		// Insert the WaveHeader to list
+		//WAVEHDR* RecordedWaveHdr = (WAVEHDR*)dwParam1;
+		//speechRecognizer->WaveHdrList.push_back(RecordedWaveHdr);
 		
+		speechRecognizer->WaveHdrList.push_back(WaveHdr);
+
+		cout << "index = " << speechRecognizer->WaveHdrList.size() - 1 << endl;
 	}
 }
 
@@ -224,13 +228,17 @@ SpeechRecognizer::listen()
 		return S_FALSE;
 	}
 
+	WaveHdrList.push_back(WaveHdr);
+
+	recognizerStatus = SpeechRecognizerListen;
+
 	// Start listening
 	if (waveInStart(hWaveIn) != MMSYSERR_NOERROR)
 	{
 		cout << "Error starting audio recording!" << endl;
 		return S_FALSE;
 	}
-	recognizerStatus = SpeechRecognizerListen;
+	
 
 	return S_OK;
 }
@@ -244,6 +252,7 @@ SpeechRecognizer::stopListening()
 		return S_FALSE;
 	}
 	
+	recognizerStatus = SpeechRecognizerNormal;
 	if (waveInStop(hWaveIn) != MMSYSERR_NOERROR)
 	{
 		std::cout << "Failed to stop recording" << std::endl;
@@ -257,7 +266,7 @@ SpeechRecognizer::stopListening()
 		hr = waveInUnprepareHeader(hWaveIn, WaveHdrList[i], sizeof(WAVEHDR));
 		if (hr != MMSYSERR_NOERROR)
 		{
-			std::cout << "Failed to unprepareHeader " << hr << "index is " << i << std::endl;
+			std::cout << "Failed to unprepareHeader code is " << hr << " index is " << i << " recorded = " << WaveHdrList[i]->dwBytesRecorded << std::endl;
 		}
 	}
 
