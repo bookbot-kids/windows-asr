@@ -155,11 +155,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="SpeechRecognizer.cpp" />
     <ClCompile Include="windows-asr.cpp" />
     <ClCompile Include="WWMFResampler.cpp" />
     <ClCompile Include="WWUtil.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="SpeechRecognizer.h" />
     <ClInclude Include="WWMFResampler.h" />
     <ClInclude Include="WWUtil.h" />
   </ItemGroup>

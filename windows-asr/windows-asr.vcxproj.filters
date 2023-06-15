@@ -24,12 +24,18 @@
     <ClCompile Include="WWUtil.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="SpeechRecognizer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="WWMFResampler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="WWUtil.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SpeechRecognizer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
