@@ -588,7 +588,7 @@ SpeechRecognizer::InitializeRecognition()
 	config.model_config.joiner_bin = "joiner_jit_trace-pnnx.ncnn.bin";
 	config.model_config.num_threads = 4;
 	config.model_config.use_vulkan_compute = 0;
-	config.decoder_config.decoding_method = "greedy_search"; // greedy_search
+	config.decoder_config.decoding_method = "modified_beam_search"; // greedy_search  modified_beam_search
 	config.decoder_config.num_active_paths = 4;
 	config.enable_endpoint = 1;
 	config.rule1_min_trailing_silence = 2.4f;

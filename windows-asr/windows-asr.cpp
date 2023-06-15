@@ -33,10 +33,6 @@
 #include <sstream>
 #include <iomanip>
 
-#include <iostream>
-#include <future>
-#include <thread>
-
 #include "SpeechRecognizer.h"
 
 #pragma comment(lib, "Ole32.lib")
