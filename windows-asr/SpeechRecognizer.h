@@ -3,12 +3,13 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <list>
+#include <thread>
+#include <functional>
 #include "WWMFResampler.h"
 #include "c-api.h"
 
 using namespace std;
-
-typedef void (*SpeechRecognizerCallbackFunc)(const std::string&);
 
 struct Configuration {
     std::string modelDir; // model folder path
@@ -35,7 +36,8 @@ struct WavHeader {
 enum SpeechRecognizerStatus {
     SpeechRecognizerNormal,
     SpeechRecognizerListen,
-    SpeechRecognizerMute
+    SpeechRecognizerMute,
+    SpeechRecognizerRelease
 };
 
 class SpeechRecognizer
@@ -72,10 +74,10 @@ public:
     void flushSpeech(std::string speechText); // set speech text property
 
     // Add a callback to receive string value from ASR
-    void addListener(SpeechRecognizerCallbackFunc listener);
+    void addListener(const std::function<void(const std::string&)>& listener);
 
     // Remove a callback ASR
-    void removeListener(SpeechRecognizerCallbackFunc listener);
+    void removeListener(const std::function<void(const std::string&)>& listener);
 
     // Clear all listeners
     void removeAllListeners();
@@ -86,26 +88,29 @@ private:
     std::string recordingId;
     SpeechRecognizerStatus recognizerStatus;
 
+    vector < std::function<void(const std::string&)> > recogCallbackList;
 private:
     // resample variables and functions
     WWMFResampler iResampler;
     IMFMediaType* pInputType;
     IMFMediaType* pOutputType;
     HRESULT InitializeResample();
-    HRESULT FinializeResample();
+    HRESULT FinalizeResample();
 
     // recognition variables and functions
     SherpaNcnnRecognizer* sherpaRecognizer;
     SherpaNcnnStream* sherpaStream;
-    SherpaNcnnDisplay* sherapDisplay;
 
     HRESULT InitializeRecognition();
     HRESULT FinializeRecognition();
 
+    std::thread recogThread;
+    void ProcessResampleRecogThread();
+
 public:
     int curRecogBockIndex;
     HWAVEIN hWaveIn;
-    vector < WAVEHDR*> WaveHdrList;
+    list < WAVEHDR*> WaveHdrList;
     SpeechRecognizerStatus getRecognizerStatus();
     HRESULT Resample(BYTE* Block, int nBytes, BYTE* SampleBlock, int* nSampleBytes);
     HRESULT Recognize(BYTE* sampledBytes, int nBytes, int index);

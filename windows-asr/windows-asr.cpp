@@ -33,6 +33,10 @@
 #include <sstream>
 #include <iomanip>
 
+#include <iostream>
+#include <future>
+#include <thread>
+
 #include "SpeechRecognizer.h"
 
 #pragma comment(lib, "Ole32.lib")
@@ -42,6 +46,14 @@
 #pragma comment(lib, "mfreadwrite.lib")
 #pragma comment(lib, "wmcodecdspuuid.lib")
 
+void displayRecognition1(const std::string & str)
+{
+	cout << " displayRecognition1 -> " << str << endl;
+}
+void displayRecognition2(const std::string& str)
+{
+	cout << " displayRecognition2 -> " <<str << endl;
+}
 
 int main()
 {
@@ -52,16 +64,23 @@ int main()
 	SpeechRecognizer recognizer;
 	recognizer.initialize("MyRecording1");
 		
+	recognizer.addListener(displayRecognition1);
+	recognizer.addListener(displayRecognition2);
+
+	recognizer.removeListener(displayRecognition1);
+
+	recognizer.flushSpeech("Hello! Nice to meet you");
 
 	cout << "Press Any key to Start recording" << endl;
 	ch = getchar();
 
 	recognizer.listen();
-	Sleep(2000);
+	Sleep(5000);
 
 	recognizer.mute();
-	Sleep(1000);
+	Sleep(3000);
 
+	recognizer.resetSpeech();
 	recognizer.unmute();
 
 	cout << "Recording now ... press Any key to Stop recording" << endl;
@@ -69,5 +88,6 @@ int main()
 
 	recognizer.stopListening();
 
-	return 0;
+	recognizer.release();
+
 }

@@ -6,6 +6,12 @@
 
 #include "SpeechRecognizer.h"
 #include <thread>
+#include <string>
+#include <iostream>
+#include <fstream>
+#include <chrono>
+#include <ctime>
+#include <iomanip>
  
 #define FORMAT_TAG			WAVE_FORMAT_PCM								// Audio Type
 #define NUMBER_OF_CHANNELS  1											// Number of channels
@@ -15,19 +21,22 @@
 #define BLOCK_ALIGN			NUMBER_OF_CHANNELS * BIT_PER_SAMPLE / 8     // Block Align
 #define BYTE_PER_SECOND		SAMPLE_RATE * BLOCK_ALIGN 					// Byte per Second
 
-#define WAVBLOCK_SIZE       12800										// 200ms.  (int)(SAMPLE_RATE * BLOCK_ALIGN * 200 / 1000)
+#define WAVBLOCK_SIZE       12800										// 200ms.  (int)(SAMPLE_RATE * BLOCK_ALIGN * 200 / 1000) 12800
 #define SAMPLEBLOCK_SIZE    6400										// Sample rate is fixed to 16 kHz  TARGET_SAMPLE_RATE * BLOCK_ALIGN * 200 / 1000
 #define RECOG_BLOCK_SIZ		3200										// SAMPLEBLOCK_SIZE / BlockAlign
 
-static void ProcessResampleRecogThread(SpeechRecognizer * speechRecognizer)
+void 
+SpeechRecognizer::ProcessResampleRecogThread()
 {
-	while (speechRecognizer->getRecognizerStatus() == SpeechRecognizerListen) {
+	cout << "This is ProcessResampleRecogThread" << endl;
+#if 0
+	while (1) {
 
-		size_t maxWaveHdrListIndex = speechRecognizer->WaveHdrList.size() - 1;
-		if (speechRecognizer->curRecogBockIndex < maxWaveHdrListIndex) {
+		int maxWaveHdrListIndex = WaveHdrList.size() - 1;
+		if (curRecogBockIndex < maxWaveHdrListIndex) {
 
 			// Process the current buffer
-			WAVEHDR* lastWaveHdr = speechRecognizer->WaveHdrList[speechRecognizer->curRecogBockIndex];
+			WAVEHDR* lastWaveHdr = WaveHdrList[curRecogBockIndex];
 			if (lastWaveHdr->dwBytesRecorded != 0) {
 				auto start = std::chrono::high_resolution_clock::now();
 
@@ -36,7 +45,7 @@ static void ProcessResampleRecogThread(SpeechRecognizer * speechRecognizer)
 
 				HRESULT hr;
 				//cout << "Processing " << curProcessIndex << " Buffer index " << lastWaveHdr->dwBytesRecorded << endl;
-				hr = speechRecognizer->Resample((BYTE*)lastWaveHdr->lpData, lastWaveHdr->dwBytesRecorded, SampleBlock, &sampleCount);
+				hr = Resample((BYTE*)lastWaveHdr->lpData, lastWaveHdr->dwBytesRecorded, SampleBlock, &sampleCount);
 				if (hr != S_OK)
 				{
 					cout << "Resample failed" << endl;
@@ -44,7 +53,7 @@ static void ProcessResampleRecogThread(SpeechRecognizer * speechRecognizer)
 				else
 				{
 					//cout << "Recorded = " << lastWaveHdr->dwBytesRecorded << " Resampled bytes = " << sampleCount << endl;
-					hr = speechRecognizer->Recognize(SampleBlock, sampleCount, speechRecognizer->curRecogBockIndex);
+					hr = Recognize(SampleBlock, sampleCount, curRecogBockIndex);
 					if (hr != S_OK)
 					{
 						cout << "Recognition failed " << endl;
@@ -56,45 +65,71 @@ static void ProcessResampleRecogThread(SpeechRecognizer * speechRecognizer)
 
 				//cout << "Current Recording Buffer Index is " << WaveHdrList.size() - 1 << " and Cur Process Index is " << curProcessIndex << " processingTime is " << duration.count() << " ms" << endl;
 				
-				std::cout <<"index "<< speechRecognizer->curRecogBockIndex << "  Time taken by the operation: " << duration.count() << " microseconds" << endl;
-				speechRecognizer->curRecogBockIndex++;
+				std::cout <<"index "<< curRecogBockIndex << "  Time taken by the operation: " << duration.count() << " microseconds" << endl;
+				curRecogBockIndex++;
 			}
 		}
 		else
 			this_thread::sleep_for(chrono::milliseconds(1));
 	}
+#endif
+
 }
 
-static void CALLBACK RecoringWavInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2)
+static void CALLBACK RecordingWavInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2)
 {
-
-	SpeechRecognizer* speechRecognizer = (SpeechRecognizer*)dwInstance;
-
 	if (uMsg == WIM_DATA) 
 	{
+		SpeechRecognizer* speechRecognizer = (SpeechRecognizer*)dwInstance;
 		WAVEHDR* RecordedWaveHdr = (WAVEHDR*)dwParam1;
-		printf("callback buffer index is %d with recorded = %d\n", speechRecognizer->WaveHdrList.size() - 1, RecordedWaveHdr->dwBytesRecorded);
-	}
+		speechRecognizer->WaveHdrList.push_back(RecordedWaveHdr);
 
-	if (uMsg == WIM_DATA && speechRecognizer->getRecognizerStatus() == SpeechRecognizerListen)
-	{
+		if (speechRecognizer->getRecognizerStatus() == SpeechRecognizerListen)
+		{
+			// Create new buffer for recording
+			WAVEHDR* WaveHdr = new WAVEHDR;
+			BYTE* buffer = new BYTE[WAVBLOCK_SIZE];
 
-		// Create new buffer for recording
-		WAVEHDR* WaveHdr = new WAVEHDR;
-		BYTE* buffer = new BYTE[WAVBLOCK_SIZE];
+			WaveHdr->lpData = (LPSTR)buffer;
+			WaveHdr->dwBufferLength = WAVBLOCK_SIZE * NUMBER_OF_CHANNELS;
+			WaveHdr->dwBytesRecorded = 0;
+			WaveHdr->dwUser = 0L;
+			WaveHdr->dwFlags = 0L;
+			WaveHdr->dwLoops = 0L;
 
-		WaveHdr->lpData = (LPSTR)buffer;
-		WaveHdr->dwBufferLength = WAVBLOCK_SIZE * NUMBER_OF_CHANNELS;
-		WaveHdr->dwBytesRecorded = 0;
-		WaveHdr->dwUser = 0L;
-		WaveHdr->dwFlags = 0L;
-		WaveHdr->dwLoops = 0L;
+			waveInPrepareHeader(speechRecognizer->hWaveIn, WaveHdr, sizeof(WAVEHDR));
+			waveInAddBuffer(speechRecognizer->hWaveIn, WaveHdr, sizeof(WAVEHDR));
+		}
 
-		waveInPrepareHeader(speechRecognizer->hWaveIn, WaveHdr, sizeof(WAVEHDR));
-		waveInAddBuffer(speechRecognizer->hWaveIn, WaveHdr, sizeof(WAVEHDR));
+		auto start = std::chrono::high_resolution_clock::now();
 
-		speechRecognizer->WaveHdrList.push_back(WaveHdr);
-		printf("current WaveHdrList size is %d\n", speechRecognizer->WaveHdrList.size());
+		BYTE SampleBlock[SAMPLEBLOCK_SIZE];
+		int sampleCount;
+
+		HRESULT hr;
+		hr = speechRecognizer->Resample((BYTE*)RecordedWaveHdr->lpData, RecordedWaveHdr->dwBytesRecorded, SampleBlock, &sampleCount);
+		if (hr != S_OK)
+		{
+			cout << "Resample failed" << endl;
+		}
+		else
+		{
+			//cout << "Recorded = " << lastWaveHdr->dwBytesRecorded << " Resampled bytes = " << sampleCount << endl;
+			hr = speechRecognizer->Recognize(SampleBlock, sampleCount, speechRecognizer->curRecogBockIndex);
+			if (hr != S_OK)
+			{
+				cout << "Recognition failed " << endl;
+			}
+		}
+
+		auto end = std::chrono::high_resolution_clock::now();
+		auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+		//cout << "Current Recording Buffer Index is " << WaveHdrList.size() - 1 << " and Cur Process Index is " << curProcessIndex << " processingTime is " << duration.count() << " ms" << endl;
+
+		std::cout << "index " << speechRecognizer->curRecogBockIndex << "  Time taken by the operation: " << duration.count() << " ms" << endl;
+		speechRecognizer->curRecogBockIndex++;
+
 	}
 }
 
@@ -136,8 +171,12 @@ SpeechRecognizer::SpeechRecognizer(Configuration config, std::string speechText_
 
 SpeechRecognizer::~SpeechRecognizer()
 {
-	recognizerStatus = SpeechRecognizerNormal;
-	release();
+	if (recognizerStatus != SpeechRecognizerRelease)
+		release();
+
+	//if (recogThread.joinable()) {
+	//	recogThread.join();
+	//}
 }
 
 HRESULT
@@ -169,7 +208,9 @@ SpeechRecognizer::initialize(std::string recordingId_s)
 		return hr;
 	}
 
-	//thread processSampleRecogThread(ProcessResampleRecogThread, this);
+	WaveHdrList.clear();
+
+	//recogThread = std::thread(&SpeechRecognizer::ProcessResampleRecogThread, this);
 
 	cout << "Initialize Library Done" << endl;
 	recognizerStatus = SpeechRecognizerNormal;
@@ -197,7 +238,7 @@ SpeechRecognizer::listen()
 	wfex.cbSize = 0;
 
 	// Open audio device
-	if (waveInOpen(&hWaveIn, WAVE_MAPPER, &wfex, (DWORD_PTR)RecoringWavInProc, (DWORD_PTR)this, CALLBACK_FUNCTION) != MMSYSERR_NOERROR)
+	if (waveInOpen(&hWaveIn, WAVE_MAPPER, &wfex, (DWORD_PTR)RecordingWavInProc, (DWORD_PTR)this, CALLBACK_FUNCTION) != MMSYSERR_NOERROR)
 	{
 		cout << "Error opening audio device!" << endl;
 		return S_FALSE;
@@ -229,8 +270,6 @@ SpeechRecognizer::listen()
 		return S_FALSE;
 	}
 
-	WaveHdrList.push_back(WaveHdr);
-
 	recognizerStatus = SpeechRecognizerListen;
 
 	// Start listening
@@ -260,15 +299,19 @@ SpeechRecognizer::stopListening()
 		return 1;
 	}
 
-	for (int i = 0; i < WaveHdrList.size(); i++)
-	{
+	int totlRecordSize = 0;
+
+	int i = 0;
+	for (auto it = WaveHdrList.begin(); it != WaveHdrList.end(); ++it, i++) {
+		WAVEHDR* wavHdr = (WAVEHDR*)*it;
 		MMRESULT hr;
 
-		hr = waveInUnprepareHeader(hWaveIn, WaveHdrList[i], sizeof(WAVEHDR));
+		hr = waveInUnprepareHeader(hWaveIn, wavHdr, sizeof(WAVEHDR));
 		if (hr != MMSYSERR_NOERROR)
 		{
-			std::cout << "Failed to unprepareHeader code is " << hr << " index is " << i << " recorded = " << WaveHdrList[i]->dwBytesRecorded << std::endl;
+			std::cout << "Failed to unprepareHeader code is " << hr << " index is " << i << " recorded = " << wavHdr->dwBytesRecorded << std::endl;
 		}
+		totlRecordSize += wavHdr->dwBytesRecorded;
 	}
 
 	// Close audio device
@@ -284,9 +327,6 @@ SpeechRecognizer::stopListening()
 	memcpy(wh.fmt, "fmt ", 4);
 	memcpy(wh.data, "data", 4);
 
-	int totlRecordSize = 0;
-	for (int i = 0; i < WaveHdrList.size(); i++) totlRecordSize += WaveHdrList[i]->dwBytesRecorded;
-
 	wh.siz_wf = BIT_PER_SAMPLE;
 	wh.wFormatTag = WAVE_FORMAT_PCM;
 	wh.nChannels = NUMBER_OF_CHANNELS;
@@ -297,18 +337,27 @@ SpeechRecognizer::stopListening()
 	wh.pcmbytes = totlRecordSize;
 	wh.bytes = wh.pcmbytes + 36;
 
+	auto now = std::chrono::system_clock::now();
+	auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(now);
+	auto epoch = now_ms.time_since_epoch();
+	auto value = std::chrono::duration_cast<std::chrono::milliseconds>(epoch);
+
+	std::string filenameSpeech = recordingId + "_" + std::to_string(value.count()) + ".txt";
+	std::ofstream outfile(filenameSpeech, ios::trunc);
+	outfile << speechText << std::endl;
+	outfile.close();
+
 	// Save audio file
-	HANDLE hFile = CreateFileW(L"new_recording.wav", GENERIC_WRITE, FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-	if (hFile)
-	{
-		DWORD dwWrite;
-		WriteFile(hFile, &wh, sizeof(WavHeader), &dwWrite, NULL);
-		for (int i = 0; i < WaveHdrList.size(); i++)
-		{
-			WriteFile(hFile, WaveHdrList[i]->lpData, WaveHdrList[i]->dwBytesRecorded, &dwWrite, NULL);
-		}
-		CloseHandle(hFile);
+	std::string filenameAAC = recordingId + "_" + std::to_string(value.count()) + ".wav";
+	std::ofstream outfileaac(filenameAAC, ios::binary | ios::trunc);
+	
+	outfileaac << std::string((const char*)&wh, (const char*)&wh + sizeof(WavHeader));
+	for (auto it = WaveHdrList.begin(); it != WaveHdrList.end(); ++it) {
+		WAVEHDR* wavHdr = (WAVEHDR*)*it;
+		outfileaac << std::string((const char*)wavHdr->lpData, (const char*)wavHdr->lpData + wavHdr->dwBytesRecorded);
 	}
+
+	outfileaac.close();
 
 	return S_OK;
 }
@@ -360,8 +409,6 @@ SpeechRecognizer::unmute()
 	waveInPrepareHeader(hWaveIn, WaveHdr, sizeof(WAVEHDR));
 	waveInAddBuffer(hWaveIn, WaveHdr, sizeof(WAVEHDR));
 
-	WaveHdrList.push_back(WaveHdr);
-
 	// Start listening
 	if (waveInStart(hWaveIn) != MMSYSERR_NOERROR)
 	{
@@ -374,15 +421,22 @@ SpeechRecognizer::unmute()
 void
 SpeechRecognizer::release()
 {
-
 	MFShutdown();
 	CoUninitialize();
+
+	FinalizeResample();
+	FinializeRecognition();
+
+	recognizerStatus = SpeechRecognizerRelease;
+
 }
 
 void
 SpeechRecognizer::resetSpeech()
 {
-
+	DestroyStream(sherpaStream);
+	DestroyRecognizer(sherpaRecognizer);
+	InitializeRecognition();
 }
 
 void
@@ -392,23 +446,35 @@ SpeechRecognizer::flushSpeech(std::string speechText_s)
 }
 
 void
-SpeechRecognizer::addListener(SpeechRecognizerCallbackFunc listener)
+SpeechRecognizer::addListener(const std::function<void(const std::string&)>& listener)
 {
+	recogCallbackList.push_back(listener);
+}
 
+template<typename T, typename... U>
+size_t getAddress(std::function<T(U...)> f) {
+	typedef T(fnType)(U...);
+	fnType** fnPointer = f.template target<fnType*>();
+	return (size_t)*fnPointer;
 }
 
 void
-SpeechRecognizer::removeListener(SpeechRecognizerCallbackFunc listener)
+SpeechRecognizer::removeListener(const std::function<void(const std::string&)>& listener)
 {
+	//auto it = std::find(recogCallbackList.begin(), recogCallbackList.end(), listener);
 
+	for (auto it = recogCallbackList.begin(); it != recogCallbackList.end(); it++) {
+		if (getAddress(*it) == getAddress(listener)) {
+			recogCallbackList.erase(it);
+		}
+	}
 }
 
 void
 SpeechRecognizer::removeAllListeners()
 {
-
+	recogCallbackList.clear();
 }
-
 
 HRESULT 
 SpeechRecognizer::InitializeResample()
@@ -491,7 +557,7 @@ SpeechRecognizer::Resample(BYTE* Block, int nBytes, BYTE* SampleBlock, int* nSam
 }
 
 HRESULT
-SpeechRecognizer::FinializeResample()
+SpeechRecognizer::FinalizeResample()
 {
 	cout << "Finalizing Resample Library" << endl;
 	iResampler.Finalize();
@@ -534,7 +600,6 @@ SpeechRecognizer::InitializeRecognition()
 
 	sherpaRecognizer = CreateRecognizer(&config);
 	sherpaStream = CreateStream(sherpaRecognizer);
-	sherapDisplay = CreateDisplay(100);
 
 	return S_OK;
 }
@@ -550,7 +615,7 @@ SpeechRecognizer::Recognize(BYTE* sampledBytes, int nBytes, int index)
 	for (int i = 0; i < nBytes - 1; i += 2, nSamples++) {
 		samples[nSamples] = ((sampledBytes[i + 1] << 8) + sampledBytes[i]) / 32768.0f;
 	}
-
+	
 	AcceptWaveform(sherpaStream, 16000, samples, nSamples);
 
 	while (IsReady(sherpaRecognizer, sherpaStream)) {
@@ -559,9 +624,12 @@ SpeechRecognizer::Recognize(BYTE* sampledBytes, int nBytes, int index)
 
 	SherpaNcnnResult* r = GetResult(sherpaRecognizer, sherpaStream);
 	if (strlen(r->text)) {
-		//cout << "buffer index : " << index << "  ";
-		SherpaNcnnPrint(sherapDisplay, segment_id, r->text);
+		//cout << "buffer index = " << index << ":" << r->text << endl;
+		for (auto& it : recogCallbackList) {
+			it(r->text);
+		}
 	}
+
 	DestroyResult(r);
 
 	return S_OK;
@@ -570,13 +638,12 @@ SpeechRecognizer::Recognize(BYTE* sampledBytes, int nBytes, int index)
 HRESULT 
 SpeechRecognizer::FinializeRecognition()
 {
-	DestroyDisplay(sherapDisplay);
 	DestroyStream(sherpaStream);
 	DestroyRecognizer(sherpaRecognizer);
+	sherpaStream = NULL;
+	sherpaRecognizer = NULL;
 	return S_OK;
 }
-
-
 
 SpeechRecognizerStatus 
 SpeechRecognizer::getRecognizerStatus()
