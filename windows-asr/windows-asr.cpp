@@ -56,8 +56,14 @@ int main()
 	char ch;
 
 	cout << "Welcome to our Windows-ASR" << endl;
+	
+	Configuration config;
+	config.modelDir = "E:/asr_model";
+	config.recordingDir = "E:/recordings/";
+	config.modelSampleRate = 16000;
 
-	SpeechRecognizer recognizer;
+	SpeechRecognizer recognizer(config);
+
 	recognizer.initialize("MyRecording1");
 		
 	recognizer.addListener(displayRecognition1);

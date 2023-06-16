@@ -101,7 +101,7 @@ static void CALLBACK RecordingWavInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInst
 			waveInAddBuffer(speechRecognizer->hWaveIn, WaveHdr, sizeof(WAVEHDR));
 		}
 
-		auto start = std::chrono::high_resolution_clock::now();
+		//auto start = std::chrono::high_resolution_clock::now();
 
 		BYTE SampleBlock[SAMPLEBLOCK_SIZE];
 		int sampleCount;
@@ -122,12 +122,12 @@ static void CALLBACK RecordingWavInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInst
 			}
 		}
 
-		auto end = std::chrono::high_resolution_clock::now();
-		auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+		//auto end = std::chrono::high_resolution_clock::now();
+		//auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
 		//cout << "Current Recording Buffer Index is " << WaveHdrList.size() - 1 << " and Cur Process Index is " << curProcessIndex << " processingTime is " << duration.count() << " ms" << endl;
 
-		std::cout << "index " << speechRecognizer->curRecogBockIndex << "  Time taken by the operation: " << duration.count() << " ms" << endl;
+		//std::cout << "index " << speechRecognizer->curRecogBockIndex << "  Time taken by the operation: " << duration.count() << " ms" << endl;
 		speechRecognizer->curRecogBockIndex++;
 
 	}
@@ -342,13 +342,13 @@ SpeechRecognizer::stopListening()
 	auto epoch = now_ms.time_since_epoch();
 	auto value = std::chrono::duration_cast<std::chrono::milliseconds>(epoch);
 
-	std::string filenameSpeech = recordingId + "_" + std::to_string(value.count()) + ".txt";
+	std::string filenameSpeech = configuration.recordingDir + "/" + recordingId + "_" + std::to_string(value.count()) + ".txt";
 	std::ofstream outfile(filenameSpeech, ios::trunc);
 	outfile << speechText << std::endl;
 	outfile.close();
 
 	// Save audio file
-	std::string filenameAAC = recordingId + "_" + std::to_string(value.count()) + ".wav";
+	std::string filenameAAC = configuration.recordingDir + "/" + recordingId + "_" + std::to_string(value.count()) + ".wav";
 	std::ofstream outfileaac(filenameAAC, ios::binary | ios::trunc);
 	
 	outfileaac << std::string((const char*)&wh, (const char*)&wh + sizeof(WavHeader));
@@ -434,9 +434,12 @@ SpeechRecognizer::release()
 void
 SpeechRecognizer::resetSpeech()
 {
-	DestroyStream(sherpaStream);
-	DestroyRecognizer(sherpaRecognizer);
-	InitializeRecognition();
+	//DestroyStream(sherpaStream);
+	//DestroyRecognizer(sherpaRecognizer);
+	//InitializeRecognition();
+
+	Reset(sherpaRecognizer, sherpaStream);
+
 }
 
 void
@@ -579,13 +582,22 @@ SpeechRecognizer::InitializeRecognition()
 	cout << "Initializing Recognition audio library" << endl;
 
 	SherpaNcnnRecognizerConfig config;
-	config.model_config.tokens = "tokens.txt";
-	config.model_config.encoder_param = "encoder_jit_trace-pnnx.ncnn.param";
-	config.model_config.encoder_bin = "encoder_jit_trace-pnnx.ncnn.bin";
-	config.model_config.decoder_param = "decoder_jit_trace-pnnx.ncnn.param";
-	config.model_config.decoder_bin = "decoder_jit_trace-pnnx.ncnn.bin";
-	config.model_config.joiner_param = "joiner_jit_trace-pnnx.ncnn.param";
-	config.model_config.joiner_bin = "joiner_jit_trace-pnnx.ncnn.bin";
+	std::string path;
+	path = configuration.modelDir + "/" + "tokens.txt";
+	config.model_config.tokens = path.c_str();
+	path = configuration.modelDir + "/" + "encoder_jit_trace-pnnx.ncnn.param";
+	config.model_config.encoder_param = path.c_str();
+	path = configuration.modelDir + "/" + "encoder_jit_trace-pnnx.ncnn.bin";
+	config.model_config.encoder_bin = path.c_str();
+	path = configuration.modelDir + "/" + "decoder_jit_trace-pnnx.ncnn.param";
+	config.model_config.decoder_param = path.c_str();
+	path = configuration.modelDir + "/" + "decoder_jit_trace-pnnx.ncnn.bin";
+	config.model_config.decoder_bin = path.c_str();
+	path = configuration.modelDir + "/" + "joiner_jit_trace-pnnx.ncnn.param";
+	config.model_config.joiner_param = path.c_str();
+	path = configuration.modelDir + "/" + "joiner_jit_trace-pnnx.ncnn.bin";
+	config.model_config.joiner_bin = path.c_str();
+
 	config.model_config.num_threads = 4;
 	config.model_config.use_vulkan_compute = 0;
 	config.decoder_config.decoding_method = "modified_beam_search"; // greedy_search  modified_beam_search
@@ -607,6 +619,9 @@ SpeechRecognizer::InitializeRecognition()
 HRESULT 
 SpeechRecognizer::Recognize(BYTE* sampledBytes, int nBytes, int index)
 {
+	if (sherpaStream == NULL || sherpaRecognizer == NULL)
+		return S_FALSE;
+
 	float samples[RECOG_BLOCK_SIZ];
 
 	int32_t segment_id = -1;
