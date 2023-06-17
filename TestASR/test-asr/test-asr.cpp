@@ -25,12 +25,17 @@ int main()
 
 	cout << "Welcome to our Windows-ASR" << endl;
 
-	SpeechRecognizer recognizer;
+	Configuration config;
+	config.modelDir = "E:\\asrmodel\\";
+	config.recordingDir = "E:\\recordings\\";
+	config.modelSampleRate = 16000;
+
+	SpeechRecognizer recognizer(config);
+
 	recognizer.initialize("MyRecording1");
 
 	recognizer.addListener(displayRecognition1);
 	recognizer.addListener(displayRecognition2);
-
 	recognizer.removeListener(displayRecognition1);
 
 	recognizer.flushSpeech("Hello! Nice to meet you");
@@ -39,6 +44,8 @@ int main()
 	ch = getchar();
 
 	recognizer.listen();
+#if 0
+
 	Sleep(5000);
 
 	recognizer.mute();
@@ -47,11 +54,13 @@ int main()
 	recognizer.resetSpeech();
 	recognizer.unmute();
 
-	cout << "Recording now ... press Any key to Stop recording" << endl;
+#endif
+	cout << "Recording and Recognize now ... press Any key to Stop ..." << endl;
 	ch = getchar();
 
 	recognizer.stopListening();
 
-	recognizer.release();
+	//recognizer.recognizeFromFile("recording.wav");
 
+	recognizer.release();
 }

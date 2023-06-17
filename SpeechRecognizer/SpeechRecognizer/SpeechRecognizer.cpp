@@ -4,17 +4,26 @@
 #include "pch.h"
 #include "framework.h"
 #include "SpeechRecognizer.h"
+#include <thread>
+#include <string>
+#include <iostream>
+#include <fstream>
+#include <chrono>
+#include <ctime>
+#include <iomanip>
+#include <algorithm>
+
 
 
 #define FORMAT_TAG			WAVE_FORMAT_PCM								// Audio Type
 #define NUMBER_OF_CHANNELS  1											// Number of channels
 #define BIT_PER_SAMPLE      16											// Bit per samples
-#define SAMPLE_RATE			32000										// Sample Rate  32kHz
+#define SAMPLE_RATE			16000										// Sample Rate  16kHz
 #define TARGET_SAMPLE_RATE	16000										// Sample Rate  16kHz
 #define BLOCK_ALIGN			NUMBER_OF_CHANNELS * BIT_PER_SAMPLE / 8     // Block Align
 #define BYTE_PER_SECOND		SAMPLE_RATE * BLOCK_ALIGN 					// Byte per Second
 
-#define WAVBLOCK_SIZE       12800										// 200ms.  (int)(SAMPLE_RATE * BLOCK_ALIGN * 200 / 1000) 12800
+#define WAVBLOCK_SIZE       6400										// 200ms.  (int)(SAMPLE_RATE * BLOCK_ALIGN * 200 / 1000) 12800
 #define SAMPLEBLOCK_SIZE    6400										// Sample rate is fixed to 16 kHz  TARGET_SAMPLE_RATE * BLOCK_ALIGN * 200 / 1000
 #define RECOG_BLOCK_SIZ		3200										// SAMPLEBLOCK_SIZE / BlockAlign
 
@@ -29,114 +38,6 @@ SPEECHRECOGNIZER_API int fnSpeechRecognizer(void)
 
 
 // This is the constructor of a class that has been exported.
-
-void
-SpeechRecognizer::ProcessResampleRecogThread()
-{
-	cout << "This is ProcessResampleRecogThread" << endl;
-#if 0
-	while (1) {
-
-		int maxWaveHdrListIndex = WaveHdrList.size() - 1;
-		if (curRecogBockIndex < maxWaveHdrListIndex) {
-
-			// Process the current buffer
-			WAVEHDR* lastWaveHdr = WaveHdrList[curRecogBockIndex];
-			if (lastWaveHdr->dwBytesRecorded != 0) {
-				auto start = std::chrono::high_resolution_clock::now();
-
-				BYTE SampleBlock[SAMPLEBLOCK_SIZE];
-				int sampleCount;
-
-				HRESULT hr;
-				//cout << "Processing " << curProcessIndex << " Buffer index " << lastWaveHdr->dwBytesRecorded << endl;
-				hr = Resample((BYTE*)lastWaveHdr->lpData, lastWaveHdr->dwBytesRecorded, SampleBlock, &sampleCount);
-				if (hr != S_OK)
-				{
-					cout << "Resample failed" << endl;
-				}
-				else
-				{
-					//cout << "Recorded = " << lastWaveHdr->dwBytesRecorded << " Resampled bytes = " << sampleCount << endl;
-					hr = Recognize(SampleBlock, sampleCount, curRecogBockIndex);
-					if (hr != S_OK)
-					{
-						cout << "Recognition failed " << endl;
-					}
-				}
-
-				auto end = std::chrono::high_resolution_clock::now();
-				auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-
-				//cout << "Current Recording Buffer Index is " << WaveHdrList.size() - 1 << " and Cur Process Index is " << curProcessIndex << " processingTime is " << duration.count() << " ms" << endl;
-
-				std::cout << "index " << curRecogBockIndex << "  Time taken by the operation: " << duration.count() << " microseconds" << endl;
-				curRecogBockIndex++;
-			}
-		}
-		else
-			this_thread::sleep_for(chrono::milliseconds(1));
-	}
-#endif
-
-}
-
-static void CALLBACK RecordingWavInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2)
-{
-	if (uMsg == WIM_DATA)
-	{
-		SpeechRecognizer* speechRecognizer = (SpeechRecognizer*)dwInstance;
-		WAVEHDR* RecordedWaveHdr = (WAVEHDR*)dwParam1;
-		speechRecognizer->WaveHdrList.push_back(RecordedWaveHdr);
-
-		if (speechRecognizer->getRecognizerStatus() == SpeechRecognizerListen)
-		{
-			// Create new buffer for recording
-			WAVEHDR* WaveHdr = new WAVEHDR;
-			BYTE* buffer = new BYTE[WAVBLOCK_SIZE];
-
-			WaveHdr->lpData = (LPSTR)buffer;
-			WaveHdr->dwBufferLength = WAVBLOCK_SIZE * NUMBER_OF_CHANNELS;
-			WaveHdr->dwBytesRecorded = 0;
-			WaveHdr->dwUser = 0L;
-			WaveHdr->dwFlags = 0L;
-			WaveHdr->dwLoops = 0L;
-
-			waveInPrepareHeader(speechRecognizer->hWaveIn, WaveHdr, sizeof(WAVEHDR));
-			waveInAddBuffer(speechRecognizer->hWaveIn, WaveHdr, sizeof(WAVEHDR));
-		}
-
-		//auto start = std::chrono::high_resolution_clock::now();
-
-		BYTE SampleBlock[SAMPLEBLOCK_SIZE];
-		int sampleCount;
-
-		HRESULT hr;
-		hr = speechRecognizer->Resample((BYTE*)RecordedWaveHdr->lpData, RecordedWaveHdr->dwBytesRecorded, SampleBlock, &sampleCount);
-		if (hr != S_OK)
-		{
-			cout << "Resample failed" << endl;
-		}
-		else
-		{
-			//cout << "Recorded = " << lastWaveHdr->dwBytesRecorded << " Resampled bytes = " << sampleCount << endl;
-			hr = speechRecognizer->Recognize(SampleBlock, sampleCount, speechRecognizer->curRecogBockIndex);
-			if (hr != S_OK)
-			{
-				cout << "Recognition failed " << endl;
-			}
-		}
-
-		//auto end = std::chrono::high_resolution_clock::now();
-		//auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-		//cout << "Current Recording Buffer Index is " << WaveHdrList.size() - 1 << " and Cur Process Index is " << curProcessIndex << " processingTime is " << duration.count() << " ms" << endl;
-
-		//std::cout << "index " << speechRecognizer->curRecogBockIndex << "  Time taken by the operation: " << duration.count() << " ms" << endl;
-		speechRecognizer->curRecogBockIndex++;
-
-	}
-}
 
 SpeechRecognizer::SpeechRecognizer()
 {
@@ -190,7 +91,7 @@ SpeechRecognizer::initialize(std::string recordingId_s)
 	recordingId = recordingId_s;
 
 	HRESULT hr = S_OK;
-
+	
 	// Core initialize
 	hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
 	if (hr != S_OK) {
@@ -202,16 +103,20 @@ SpeechRecognizer::initialize(std::string recordingId_s)
 		cout << "Failed to MFStartup()" << endl;
 		return hr;
 	}
-	hr = InitializeResample();
-	if (hr != S_OK) {
-		cout << "Failed to InitializeResample()" << endl;
-		return hr;
-	}
-	hr = InitializeRecognition();
-	if (hr != S_OK) {
-		cout << "Failed to InitializeRecognition()" << endl;
-		return hr;
-	}
+
+
+    hr = InitializeRecognition();
+    if (hr != S_OK) {
+        cout << "Failed to InitializeRecognition()" << endl;
+        return hr;
+    }
+
+
+    hr = InitializeResample();
+    if (hr != S_OK) {
+        cout << "Failed to InitializeResample()" << endl;
+        return hr;
+    }
 
 	WaveHdrList.clear();
 
@@ -223,7 +128,50 @@ SpeechRecognizer::initialize(std::string recordingId_s)
 	return hr;
 }
 
-HRESULT
+static void CALLBACK RecordingWavInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInstance, DWORD_PTR dwParam1, DWORD_PTR dwParam2)
+{
+	if (uMsg == WIM_DATA)
+	{
+		SpeechRecognizer* speechRecognizer = (SpeechRecognizer*)dwInstance;
+		WAVEHDR* RecordedWaveHdr = (WAVEHDR*)dwParam1;
+		speechRecognizer->WaveHdrList.push_back(RecordedWaveHdr);
+
+		if (speechRecognizer->getRecognizerStatus() == SpeechRecognizerListen)
+		{
+			// Create new buffer for recording
+			WAVEHDR* WaveHdr = new WAVEHDR;
+			BYTE* buffer = new BYTE[WAVBLOCK_SIZE];
+
+			WaveHdr->lpData = (LPSTR)buffer;
+			WaveHdr->dwBufferLength = WAVBLOCK_SIZE * NUMBER_OF_CHANNELS;
+			WaveHdr->dwBytesRecorded = 0;
+			WaveHdr->dwUser = 0L;
+			WaveHdr->dwFlags = 0L;
+			WaveHdr->dwLoops = 0L;
+
+			waveInPrepareHeader(speechRecognizer->hWaveIn, WaveHdr, sizeof(WAVEHDR));
+			waveInAddBuffer(speechRecognizer->hWaveIn, WaveHdr, sizeof(WAVEHDR));
+		}
+
+		auto start = std::chrono::high_resolution_clock::now();
+
+		HRESULT hr;
+		hr = speechRecognizer->Recognize((int8_t*)RecordedWaveHdr->lpData, RecordedWaveHdr->dwBytesRecorded, speechRecognizer->curRecogBockIndex);
+		if (hr != S_OK)
+		{
+			cout << "Recognition failed " << endl;
+		}
+
+		auto end = std::chrono::high_resolution_clock::now();
+		auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+		//std::cout << "index " << speechRecognizer->curRecogBockIndex << "  Time taken by the operation: " << duration.count() << " ms" << endl;
+		speechRecognizer->curRecogBockIndex++;
+
+	}
+}
+
+HRESULT 
 SpeechRecognizer::listen()
 {
 	if (recognizerStatus == SpeechRecognizerListen)
@@ -283,7 +231,7 @@ SpeechRecognizer::listen()
 		cout << "Error starting audio recording!" << endl;
 		return S_FALSE;
 	}
-
+	
 
 	return S_OK;
 }
@@ -296,7 +244,7 @@ SpeechRecognizer::stopListening()
 		cout << "Please listen to the audio first" << endl;
 		return S_FALSE;
 	}
-
+	
 	recognizerStatus = SpeechRecognizerNormal;
 	if (waveInStop(hWaveIn) != MMSYSERR_NOERROR)
 	{
@@ -355,7 +303,7 @@ SpeechRecognizer::stopListening()
 	// Save audio file
 	std::string filenameAAC = configuration.recordingDir + "/" + recordingId + "_" + std::to_string(value.count()) + ".wav";
 	std::ofstream outfileaac(filenameAAC, ios::binary | ios::trunc);
-
+	
 	outfileaac << std::string((const char*)&wh, (const char*)&wh + sizeof(WavHeader));
 	for (auto it = WaveHdrList.begin(); it != WaveHdrList.end(); ++it) {
 		WAVEHDR* wavHdr = (WAVEHDR*)*it;
@@ -426,14 +374,14 @@ SpeechRecognizer::unmute()
 void
 SpeechRecognizer::release()
 {
+
+	recognizerStatus = SpeechRecognizerRelease;
+
 	MFShutdown();
 	CoUninitialize();
 
 	FinalizeResample();
 	FinializeRecognition();
-
-	recognizerStatus = SpeechRecognizerRelease;
-
 }
 
 void
@@ -484,7 +432,7 @@ SpeechRecognizer::removeAllListeners()
 	recogCallbackList.clear();
 }
 
-HRESULT
+HRESULT 
 SpeechRecognizer::InitializeResample()
 {
 	HRESULT hr = S_OK;
@@ -581,39 +529,46 @@ SpeechRecognizer::FinalizeResample()
 	return S_OK;
 }
 
-HRESULT
+HRESULT 
 SpeechRecognizer::InitializeRecognition()
 {
 	cout << "Initializing Recognition audio library" << endl;
 
-	SherpaNcnnRecognizerConfig config;
-	std::string path;
-	path = configuration.modelDir + "/" + "tokens.txt";
-	config.model_config.tokens = path.c_str();
-	path = configuration.modelDir + "/" + "encoder_jit_trace-pnnx.ncnn.param";
-	config.model_config.encoder_param = path.c_str();
-	path = configuration.modelDir + "/" + "encoder_jit_trace-pnnx.ncnn.bin";
-	config.model_config.encoder_bin = path.c_str();
-	path = configuration.modelDir + "/" + "decoder_jit_trace-pnnx.ncnn.param";
-	config.model_config.decoder_param = path.c_str();
-	path = configuration.modelDir + "/" + "decoder_jit_trace-pnnx.ncnn.bin";
-	config.model_config.decoder_bin = path.c_str();
-	path = configuration.modelDir + "/" + "joiner_jit_trace-pnnx.ncnn.param";
-	config.model_config.joiner_param = path.c_str();
-	path = configuration.modelDir + "/" + "joiner_jit_trace-pnnx.ncnn.bin";
-	config.model_config.joiner_bin = path.c_str();
-
-	config.model_config.num_threads = 4;
-	config.model_config.use_vulkan_compute = 0;
-	config.decoder_config.decoding_method = "modified_beam_search"; // greedy_search  modified_beam_search
-	config.decoder_config.num_active_paths = 4;
-	config.enable_endpoint = 1;
-	config.rule1_min_trailing_silence = 2.4f;
-	config.rule2_min_trailing_silence = 1.2f;
-	config.rule3_min_utterance_length = 300.0f;
-
-	config.feat_config.sampling_rate = 16000.0;
-	config.feat_config.feature_dim = 80;
+    sherpaConfig.tokens = configuration.modelDir + "tokens.txt";
+    sherpaConfig.encoder_param = configuration.modelDir + "encoder_jit_trace-pnnx.ncnn.param";
+    sherpaConfig.encoder_bin = configuration.modelDir + "encoder_jit_trace-pnnx.ncnn.bin";
+    sherpaConfig.decoder_param = configuration.modelDir + "decoder_jit_trace-pnnx.ncnn.param";
+    sherpaConfig.decoder_bin = configuration.modelDir + "decoder_jit_trace-pnnx.ncnn.bin";
+    sherpaConfig.joiner_param = configuration.modelDir + "joiner_jit_trace-pnnx.ncnn.param";
+    sherpaConfig.joiner_bin = configuration.modelDir + "joiner_jit_trace-pnnx.ncnn.bin";
+    sherpaConfig.decoding_method = "modified_beam_search"; // greedy_search
+    sherpaConfig.num_threads = 4;
+    sherpaConfig.use_vulkan_compute = 0;
+    sherpaConfig.num_active_paths = 4;
+    sherpaConfig.enable_endpoint = true;
+    sherpaConfig.rule1_min_trailing_silence = 2.4f;
+    sherpaConfig.rule2_min_trailing_silence = 1.2f;
+    sherpaConfig.rule3_min_utterance_length = 300.0f;
+    sherpaConfig.sampling_rate = configuration.modelSampleRate;
+    sherpaConfig.feature_dim = 80;
+    
+    config.model_config.tokens = sherpaConfig.tokens.c_str();
+    config.model_config.encoder_param = sherpaConfig.encoder_param.c_str();
+    config.model_config.encoder_bin = sherpaConfig.encoder_bin.c_str();
+    config.model_config.decoder_param = sherpaConfig.decoder_param.c_str();
+    config.model_config.decoder_bin = sherpaConfig.decoder_bin.c_str();
+    config.model_config.joiner_param = sherpaConfig.joiner_param.c_str();
+    config.model_config.joiner_bin = sherpaConfig.joiner_bin.c_str();
+    config.decoder_config.decoding_method = sherpaConfig.decoding_method.c_str();
+    config.model_config.num_threads = sherpaConfig.num_threads;
+    config.model_config.use_vulkan_compute = sherpaConfig.use_vulkan_compute;
+    config.decoder_config.num_active_paths = sherpaConfig.num_active_paths;
+    config.enable_endpoint = sherpaConfig.enable_endpoint;
+    config.rule1_min_trailing_silence = sherpaConfig.rule1_min_trailing_silence;
+    config.rule2_min_trailing_silence = sherpaConfig.rule2_min_trailing_silence;
+    config.rule3_min_utterance_length = sherpaConfig.rule3_min_utterance_length;
+    config.feat_config.sampling_rate = sherpaConfig.sampling_rate;
+    config.feat_config.feature_dim = sherpaConfig.feature_dim;
 
 	sherpaRecognizer = CreateRecognizer(&config);
 	sherpaStream = CreateStream(sherpaRecognizer);
@@ -621,8 +576,8 @@ SpeechRecognizer::InitializeRecognition()
 	return S_OK;
 }
 
-HRESULT
-SpeechRecognizer::Recognize(BYTE* sampledBytes, int nBytes, int index)
+HRESULT 
+SpeechRecognizer::Recognize(int8_t* sampledBytes, int nBytes, int index)
 {
 	if (sherpaStream == NULL || sherpaRecognizer == NULL)
 		return S_FALSE;
@@ -632,22 +587,34 @@ SpeechRecognizer::Recognize(BYTE* sampledBytes, int nBytes, int index)
 	int32_t segment_id = -1;
 	int nSamples = 0;
 
-	for (int i = 0; i < nBytes - 1; i += 2, nSamples++) {
-		samples[nSamples] = ((sampledBytes[i + 1] << 8) + sampledBytes[i]) / 32768.0f;
+	for (int i = 0; i < nBytes; i += 2, nSamples++) {
+		samples[nSamples] = ((static_cast<int16_t>(sampledBytes[i + 1]) << 8) | (uint8_t)sampledBytes[i]) / 32768.;
 	}
-
+	
 	AcceptWaveform(sherpaStream, 16000, samples, nSamples);
 
 	while (IsReady(sherpaRecognizer, sherpaStream)) {
 		Decode(sherpaRecognizer, sherpaStream);
 	}
 
+	static std::string lastText;
+	bool is_endpoint = IsEndpoint(sherpaRecognizer, sherpaStream);
 	SherpaNcnnResult* r = GetResult(sherpaRecognizer, sherpaStream);
-	if (strlen(r->text)) {
-		//cout << "buffer index = " << index << ":" << r->text << endl;
+
+	std::string recogText(r->text);
+
+	if (!recogText.empty() && lastText != recogText) {
+		lastText = recogText;
+		std::transform(recogText.begin(), recogText.end(), recogText.begin(),
+			[](auto c) { return std::tolower(c); });
+
 		for (auto& it : recogCallbackList) {
-			it(r->text);
+			it(recogText);
 		}
+	}
+
+	if (is_endpoint) {
+		resetSpeech();
 	}
 
 	DestroyResult(r);
@@ -655,18 +622,72 @@ SpeechRecognizer::Recognize(BYTE* sampledBytes, int nBytes, int index)
 	return S_OK;
 }
 
-HRESULT
+HRESULT 
 SpeechRecognizer::FinializeRecognition()
 {
+	cout << "FinializeRecognition ... " << endl;
 	DestroyStream(sherpaStream);
 	DestroyRecognizer(sherpaRecognizer);
 	sherpaStream = NULL;
 	sherpaRecognizer = NULL;
+	cout << "FinializeRecognition Done" << endl;
 	return S_OK;
 }
 
-SpeechRecognizerStatus
+SpeechRecognizerStatus 
 SpeechRecognizer::getRecognizerStatus()
 {
 	return recognizerStatus;
+}
+
+void 
+SpeechRecognizer::ProcessResampleRecogThread()
+{
+
+}
+
+void 
+SpeechRecognizer::recognizeFromFile(const char* wavfileName)
+{
+	const char* wav_filename = wavfileName;
+	FILE* fp = NULL;
+	fopen_s(&fp, wav_filename, "rb");
+	if (!fp) {
+		fprintf(stderr, "Failed to open %s\n", wav_filename);
+		return;
+	}
+
+	// Assume the wave header occupies 44 bytes.
+	fseek(fp, 44, SEEK_SET);
+
+	// simulate streaming
+
+	int8_t buffer[RECOG_BLOCK_SIZ * 2];
+	float samples[RECOG_BLOCK_SIZ];
+
+	int32_t segment_id = -1;
+
+	while (!feof(fp)) {
+		size_t n = fread((void*)buffer, sizeof(int8_t), RECOG_BLOCK_SIZ*2, fp);
+		if (n > 0) {
+			int sampleCount = 0;
+			for (size_t i = 0; i < n; i +=2, sampleCount++) {
+				samples[sampleCount] = ((static_cast<int16_t>(buffer[i + 1]) << 8) | (uint8_t)buffer[i]) / 32768.;
+			}
+
+			AcceptWaveform(sherpaStream, 16000, samples, sampleCount);
+			while (IsReady(sherpaRecognizer, sherpaStream)) {
+				Decode(sherpaRecognizer, sherpaStream);
+			}
+
+			SherpaNcnnResult* r = GetResult(sherpaRecognizer, sherpaStream);
+			if (strlen(r->text)) {
+				cout << r->text << endl;
+			}
+			DestroyResult(r);
+		}
+	}
+	fclose(fp);
+
+	fprintf(stderr, "\n");
 }
