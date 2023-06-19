@@ -45,13 +45,36 @@
 #include <sstream>
 #include <iomanip>
 
-using namespace std;
+#include "WWMFResampler.h"
+#include "c-api.h"
 
+using namespace std;
 
 struct Configuration {
     std::string modelDir; // model folder path
     int modelSampleRate; // default 16khz
     std::string recordingDir; //folder to save aac recording
+};
+
+struct SherpaConfig {
+    std::string tokens;
+    std::string encoder_param;
+    std::string encoder_bin;
+    std::string decoder_param;
+    std::string decoder_bin;
+    std::string joiner_param;
+    std::string joiner_bin;
+    std::string decoding_method;
+
+    int num_threads;
+    int use_vulkan_compute;
+    int num_active_paths;
+    bool enable_endpoint;
+    float rule1_min_trailing_silence;
+    float rule2_min_trailing_silence;
+    float rule3_min_utterance_length;
+    float sampling_rate;
+    float feature_dim;
 };
 
 struct WavHeader {
@@ -125,9 +148,42 @@ public:
     void recognizeFromFile(const char*);
 
 private:
+    SherpaConfig sherpaConfig;
     Configuration configuration;
     std::string speechText;
     std::string recordingId;
     SpeechRecognizerStatus recognizerStatus;
+
+    vector < std::function<void(const std::string&)> > recogCallbackList;
+private:
+    // resample variables and functions
+    WWMFResampler iResampler;
+    IMFMediaType* pInputType;
+    IMFMediaType* pOutputType;
+    HRESULT InitializeResample();
+    HRESULT FinalizeResample();
+
+    // recognition variables and functions
+    SherpaNcnnRecognizer* sherpaRecognizer;
+    SherpaNcnnStream* sherpaStream;
+
+    HRESULT InitializeRecognition();
+    HRESULT FinializeRecognition();
+
+    std::thread recogThread;
+    void ProcessResampleRecogThread();
+
+public:
+    SherpaNcnnRecognizerConfig config;
+    int curRecogBockIndex;
+    HWAVEIN hWaveIn;
+    list < WAVEHDR*> WaveHdrList;
+    SpeechRecognizerStatus getRecognizerStatus();
+    HRESULT Resample(BYTE* Block, int nBytes, BYTE* SampleBlock, int* nSampleBytes);
+    HRESULT Recognize(int8_t* sampledBytes, int nBytes, int index);
 };
 
+
+extern SPEECHRECOGNIZER_API int nSpeechRecognizer;
+
+SPEECHRECOGNIZER_API int fnSpeechRecognizer(void);
