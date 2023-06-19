@@ -5,6 +5,9 @@
 */
 
 #include "SpeechRecognizer.h"
+#include <mfapi.h>
+#include <mfidl.h>
+#include <mfreadwrite.h>
 #include <thread>
 #include <string>
 #include <iostream>
@@ -14,15 +17,24 @@
 #include <iomanip>
 #include <algorithm>
 
+#include <mfapi.h>
+#include <mfidl.h>
+#include <mfreadwrite.h>
+#include <iostream>
+
+#pragma comment(lib, "mf")
+#pragma comment(lib, "mfplat")
+#pragma comment(lib, "mfreadwrite")
+
 #define FORMAT_TAG          WAVE_FORMAT_PCM                             // Audio Type
 #define NUMBER_OF_CHANNELS  1                                           // Number of channels
 #define BIT_PER_SAMPLE      16                                          // Bit per samples
-#define SAMPLE_RATE         16000                                       // Sample Rate  16kHz
+#define SAMPLE_RATE         44100                                       // Sample Rate  44100kHz
 #define TARGET_SAMPLE_RATE  16000                                       // Sample Rate  16kHz
 #define BLOCK_ALIGN         NUMBER_OF_CHANNELS * BIT_PER_SAMPLE / 8     // Block Align
 #define BYTE_PER_SECOND     SAMPLE_RATE * BLOCK_ALIGN                   // Byte per Second
 
-#define WAVBLOCK_SIZE       6400                                        // 200ms.  (int)(SAMPLE_RATE * BLOCK_ALIGN * 200 / 1000) 12800
+#define WAVBLOCK_SIZE       17640                                       // 200ms.  (int)(SAMPLE_RATE * BLOCK_ALIGN * 200 / 1000) 19200
 #define SAMPLEBLOCK_SIZE    6400                                        // Sample rate is fixed to 16 kHz  TARGET_SAMPLE_RATE * BLOCK_ALIGN * 200 / 1000
 #define RECOG_BLOCK_SIZ     3200                                        // SAMPLEBLOCK_SIZE / BlockAlign
 
@@ -143,9 +155,14 @@ static void CALLBACK RecordingWavInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInst
         }
 
         auto start = std::chrono::high_resolution_clock::now();
+        
+        int8_t sampleBytes[SAMPLEBLOCK_SIZE];
+        int nBytes;
+
+        speechRecognizer->Resample((BYTE*)RecordedWaveHdr->lpData, RecordedWaveHdr->dwBytesRecorded, (BYTE*)sampleBytes, &nBytes);
 
         HRESULT hr;
-        hr = speechRecognizer->Recognize((int8_t*)RecordedWaveHdr->lpData, RecordedWaveHdr->dwBytesRecorded, speechRecognizer->curRecogBockIndex);
+        hr = speechRecognizer->Recognize(sampleBytes, nBytes, speechRecognizer->curRecogBockIndex);
         if (hr != S_OK)
         {
             cout << "Recognition failed " << endl;
@@ -156,7 +173,6 @@ static void CALLBACK RecordingWavInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInst
 
         //std::cout << "index " << speechRecognizer->curRecogBockIndex << "  Time taken by the operation: " << duration.count() << " ms" << endl;
         speechRecognizer->curRecogBockIndex++;
-
     }
 }
 
@@ -225,6 +241,21 @@ SpeechRecognizer::listen()
     return S_OK;
 }
 
+LPCWSTR ConvertToLPCWSTR(const std::string& str)
+{
+    int numChars = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, nullptr, 0);
+    if (numChars == 0)
+    {
+        // Failed to get the number of characters needed
+        return nullptr;
+    }
+
+    wchar_t* wideStr = new wchar_t[numChars];
+    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, wideStr, numChars);
+
+    return wideStr;
+}
+
 HRESULT
 SpeechRecognizer::stopListening()
 {
@@ -284,14 +315,14 @@ SpeechRecognizer::stopListening()
     auto epoch = now_ms.time_since_epoch();
     auto value = std::chrono::duration_cast<std::chrono::milliseconds>(epoch);
 
-    std::string filenameSpeech = configuration.recordingDir + "/" + recordingId + "_" + std::to_string(value.count()) + ".txt";
+    std::string filenameSpeech = configuration.recordingDir + recordingId + "_" + std::to_string(value.count()) + ".txt";
     std::ofstream outfile(filenameSpeech, ios::trunc);
     outfile << speechText << std::endl;
     outfile.close();
 
     // Save audio file
-    std::string filenameAAC = configuration.recordingDir + "/" + recordingId + "_" + std::to_string(value.count()) + ".wav";
-    std::ofstream outfileaac(filenameAAC, ios::binary | ios::trunc);
+    std::string filenameWAV = configuration.recordingDir + recordingId + "_" + std::to_string(value.count()) + ".wav";
+    std::ofstream outfileaac(filenameWAV, ios::binary | ios::trunc);
 
     outfileaac << std::string((const char*)&wh, (const char*)&wh + sizeof(WavHeader));
     for (auto it = WaveHdrList.begin(); it != WaveHdrList.end(); ++it) {
@@ -300,6 +331,11 @@ SpeechRecognizer::stopListening()
     }
 
     outfileaac.close();
+
+
+    std::string filenameAAC = configuration.recordingDir + recordingId + "_" + std::to_string(value.count()) + ".aac";
+
+    ConvertWavToAac(ConvertToLPCWSTR(filenameWAV), ConvertToLPCWSTR(filenameAAC));
 
     return S_OK;
 }
@@ -687,4 +723,106 @@ SpeechRecognizer::recognizeFromFile(const char* wavfileName)
     }
     fclose(fp);
     fprintf(stderr, "\n");
+}
+
+
+HRESULT 
+SpeechRecognizer::ConvertWavToAac(LPCWSTR wavFilePath, LPCWSTR aacFilePath)
+{
+    IMFSourceReader* pReader = NULL;
+    IMFMediaType* pInputType = NULL;
+    IMFMediaType* pOutputType = NULL;
+    IMFSinkWriter* pWriter = NULL;
+
+    DWORD streamIndex = 0;
+    LONGLONG duration = 0;
+    UINT32 inputSampleRate;
+    UINT32 numChannels = 0;
+    UINT32 bytepersecond = 0;
+    UINT32 blockAlign = 0;
+    UINT32 bitPerSample = 0;
+
+    HRESULT hr = S_OK;
+
+    hr = MFCreateSourceReaderFromURL(wavFilePath, NULL, &pReader);
+    hr = MFCreateSinkWriterFromURL(aacFilePath, NULL, NULL, &pWriter);
+
+    hr = pReader->GetCurrentMediaType((DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, &pInputType);
+    hr = pInputType->GetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, &inputSampleRate);
+    hr = pInputType->GetUINT32(MF_MT_AUDIO_NUM_CHANNELS, &numChannels);
+    hr = pInputType->GetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, &bytepersecond);
+    hr = pInputType->GetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, &blockAlign);
+    hr = pInputType->GetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, &bitPerSample);
+
+    hr = MFCreateMediaType(&pOutputType);
+    hr = pOutputType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
+    hr = pOutputType->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_AAC);
+    hr = pOutputType->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, bitPerSample);
+    hr = pOutputType->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, inputSampleRate);
+    hr = pOutputType->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, numChannels);
+    hr = pOutputType->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, 20000);
+    hr = pOutputType->SetUINT32(MF_MT_AAC_PAYLOAD_TYPE, 0);
+    hr = pOutputType->SetUINT32(MF_MT_AAC_AUDIO_PROFILE_LEVEL_INDICATION, 0x29);
+    hr = pOutputType->SetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, 1);
+    hr = pOutputType->SetUINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, 0);
+    hr = pOutputType->SetUINT32(MF_MT_AVG_BITRATE, 16000);
+
+    hr = pWriter->AddStream(pOutputType, &streamIndex);
+    hr = pWriter->SetInputMediaType(streamIndex, pInputType, NULL);
+    hr = pWriter->BeginWriting();
+
+    DWORD flags = 0;
+    LONGLONG timestamp = 0;
+
+    while (true)
+    {
+        WWMFSampleData sampleData_return;
+        DWORD flags = 0;
+        LONGLONG timestamp = 0;
+        IMFSample* pSample = NULL;
+
+        hr = pReader->ReadSample((DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, NULL, &flags, &timestamp, &pSample);
+        if (FAILED(hr) || (flags & MF_SOURCE_READERF_ENDOFSTREAM))
+        {
+            break;
+        }
+
+        if (pSample)
+        {
+            hr = pSample->SetSampleTime(timestamp);
+
+            if (SUCCEEDED(hr))
+            {
+                hr = pSample->SetSampleDuration(duration);
+            }
+
+            hr = pWriter->WriteSample(streamIndex, pSample);
+
+            pSample->Release();
+        }
+    }
+
+    hr = pWriter->SendStreamTick(streamIndex, duration);
+
+    if (pWriter)
+    {
+        pWriter->Finalize();
+    }
+
+    if (pReader)
+    {
+        pReader->Release();
+    }
+
+    if (pInputType)
+    {
+        pInputType->Release();
+    }
+
+    if (pOutputType)
+    {
+        pOutputType->Release();
+    }
+
+    return hr;
 }

@@ -147,6 +147,9 @@ public:
     // Recognize from file
     void recognizeFromFile(const char*);
 
+    // Convert wav to aac 
+    HRESULT ConvertWavToAac(LPCWSTR inputFilePath, LPCWSTR outputFilePath);
+
 private:
     SherpaConfig sherpaConfig;
     Configuration configuration;
