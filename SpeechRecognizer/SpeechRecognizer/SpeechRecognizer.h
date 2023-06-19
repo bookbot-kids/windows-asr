@@ -49,7 +49,7 @@
 #include "c-api.h"
 
 using namespace std;
-
+#pragma warning(disable: 4251)
 struct Configuration {
     std::string modelDir; // model folder path
     int modelSampleRate; // default 16khz

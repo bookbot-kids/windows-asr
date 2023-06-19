@@ -8,3 +8,5 @@
 /windows-asr/*.wav
 /windows-asr/*.txt
 /windows-asr/*.exe
+/SpeechRecognizer/SpeechRecognizer/x64
+/TestASR/test-asr/x64

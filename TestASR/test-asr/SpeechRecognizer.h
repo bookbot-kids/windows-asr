@@ -49,7 +49,7 @@
 #include "c-api.h"
 
 using namespace std;
-
+#pragma warning(disable: 4251)
 struct Configuration {
     std::string modelDir; // model folder path
     int modelSampleRate; // default 16khz
@@ -146,6 +146,9 @@ public:
 
     // Recognize from file
     void recognizeFromFile(const char*);
+
+    // Convert wav to aac 
+    HRESULT ConvertWavToAac(LPCWSTR inputFilePath, LPCWSTR outputFilePath);
 
 private:
     SherpaConfig sherpaConfig;
