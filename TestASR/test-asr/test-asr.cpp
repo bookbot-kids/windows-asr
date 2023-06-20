@@ -21,6 +21,7 @@ void displayRecognition2(const std::string& str)
 
 int main()
 {
+
 	char ch;
 
 	cout << "Welcome to our Windows-ASR" << endl;
@@ -30,20 +31,20 @@ int main()
 	config.recordingDir = "E:\\recordings\\";
 	config.modelSampleRate = 16000;
 
-	SpeechRecognizer recognizer(config);
+	std::unique_ptr<SpeechRecognizer> recognizer = std::make_unique<SpeechRecognizer>(config);
 
-	recognizer.initialize("MyRecording1");
+	recognizer->initialize("MyRecording1");
 
-	recognizer.addListener(displayRecognition1);
-	recognizer.addListener(displayRecognition2);
-	recognizer.removeListener(displayRecognition1);
+	recognizer->addListener(displayRecognition1);
+	recognizer->addListener(displayRecognition2);
+	recognizer->removeListener(displayRecognition1);
 
-	recognizer.flushSpeech("Hello! Nice to meet you");
+	recognizer->flushSpeech("Hello! Nice to meet you");
 
 	cout << "Press Any key to Start recording" << endl;
 	ch = getchar();
 
-	recognizer.listen();
+	recognizer->listen();
 #if 0
 
 	Sleep(5000);
@@ -58,7 +59,7 @@ int main()
 	cout << "Recording and Recognize now ... press Any key to Stop ..." << endl;
 	ch = getchar();
 
-	recognizer.stopListening();
+	recognizer->stopListening();
 
 	//recognizer.recognizeFromFile("recording.wav");
 

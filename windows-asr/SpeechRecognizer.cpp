@@ -47,7 +47,7 @@ SpeechRecognizer::SpeechRecognizer()
     configuration.modelSampleRate = 16000;
     configuration.recordingDir = "";
 
-    recognizerStatus = SpeechRecognizerNormal;
+    recognizerStatus = SpeechRecognizerStart;
 }
 
 SpeechRecognizer::SpeechRecognizer(Configuration config)
@@ -59,7 +59,7 @@ SpeechRecognizer::SpeechRecognizer(Configuration config)
     configuration.modelSampleRate = config.modelSampleRate;
     configuration.recordingDir = config.recordingDir;
 
-    recognizerStatus = SpeechRecognizerNormal;
+    recognizerStatus = SpeechRecognizerStart;
 }
 
 SpeechRecognizer::SpeechRecognizer(Configuration config, std::string speechText_s, std::string recordingId_s)
@@ -71,17 +71,15 @@ SpeechRecognizer::SpeechRecognizer(Configuration config, std::string speechText_
     configuration.modelSampleRate = config.modelSampleRate;
     configuration.recordingDir = config.recordingDir;
 
-    recognizerStatus = SpeechRecognizerNormal;
+    recognizerStatus = SpeechRecognizerStart;
 }
 
 SpeechRecognizer::~SpeechRecognizer()
 {
+    if (recognizerStatus == SpeechRecognizerStart)
+        return;
     if (recognizerStatus != SpeechRecognizerRelease)
         release();
-
-    //if (recogThread.joinable()) {
-    //  recogThread.join();
-    //}
 }
 
 HRESULT
@@ -92,11 +90,11 @@ SpeechRecognizer::initialize(std::string recordingId_s)
     HRESULT hr = S_OK;
 
     // Core initialize
-    hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    /*hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     if (hr != S_OK) {
         cout << "Failed to CoInitializeEx()" << endl;
         return hr;
-    }
+    }*/
     hr = MFStartup(MF_VERSION);
     if (hr != S_OK) {
         cout << "Failed to MFStartup()" << endl;
@@ -115,9 +113,6 @@ SpeechRecognizer::initialize(std::string recordingId_s)
         cout << "Failed to InitializeResample()" << endl;
         return hr;
     }
-
-
-    
 
     WaveHdrList.clear();
 
@@ -152,33 +147,38 @@ static void CALLBACK RecordingWavInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInst
 
             waveInPrepareHeader(speechRecognizer->hWaveIn, WaveHdr, sizeof(WAVEHDR));
             waveInAddBuffer(speechRecognizer->hWaveIn, WaveHdr, sizeof(WAVEHDR));
+
+            auto start = std::chrono::high_resolution_clock::now();
+
+            int8_t sampleBytes[SAMPLEBLOCK_SIZE];
+            int nBytes;
+
+            speechRecognizer->Resample((BYTE*)RecordedWaveHdr->lpData, RecordedWaveHdr->dwBytesRecorded, (BYTE*)sampleBytes, &nBytes);
+
+            HRESULT hr;
+            hr = speechRecognizer->Recognize(sampleBytes, nBytes, speechRecognizer->curRecogBockIndex);
+            if (hr != S_OK)
+            {
+                cout << "Recognition failed " << endl;
+            }
+
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+            //std::cout << "index " << speechRecognizer->curRecogBockIndex << "  Time taken by the operation: " << duration.count() << " ms" << endl;
+            speechRecognizer->curRecogBockIndex++;
         }
-
-        auto start = std::chrono::high_resolution_clock::now();
-        
-        int8_t sampleBytes[SAMPLEBLOCK_SIZE];
-        int nBytes;
-
-        speechRecognizer->Resample((BYTE*)RecordedWaveHdr->lpData, RecordedWaveHdr->dwBytesRecorded, (BYTE*)sampleBytes, &nBytes);
-
-        HRESULT hr;
-        hr = speechRecognizer->Recognize(sampleBytes, nBytes, speechRecognizer->curRecogBockIndex);
-        if (hr != S_OK)
-        {
-            cout << "Recognition failed " << endl;
-        }
-
-        auto end = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-        //std::cout << "index " << speechRecognizer->curRecogBockIndex << "  Time taken by the operation: " << duration.count() << " ms" << endl;
-        speechRecognizer->curRecogBockIndex++;
     }
 }
 
 HRESULT
 SpeechRecognizer::listen()
 {
+    if (recognizerStatus == SpeechRecognizerStart)
+    {
+        cout << "Initialize the library first" << endl;
+        return S_FALSE;
+    }
     if (recognizerStatus == SpeechRecognizerListen)
     {
         cout << "Recognizer is already listening";
@@ -259,6 +259,12 @@ LPCWSTR ConvertToLPCWSTR(const std::string& str)
 HRESULT
 SpeechRecognizer::stopListening()
 {
+    if (recognizerStatus == SpeechRecognizerStart)
+    {
+        cout << "Initialize the library first" << endl;
+        return S_FALSE;
+    }
+
     if (!(recognizerStatus == SpeechRecognizerListen || recognizerStatus == SpeechRecognizerMute))
     {
         cout << "Please listen to the audio first" << endl;
@@ -343,6 +349,12 @@ SpeechRecognizer::stopListening()
 HRESULT
 SpeechRecognizer::mute()
 {
+    if (recognizerStatus == SpeechRecognizerStart)
+    {
+        cout << "Initialize the library first" << endl;
+        return S_FALSE;
+    }
+
     if (recognizerStatus != SpeechRecognizerListen)
     {
         std::cout << "Please listen to audio first" << std::endl;
@@ -365,6 +377,11 @@ SpeechRecognizer::mute()
 HRESULT
 SpeechRecognizer::unmute()
 {
+    if (recognizerStatus == SpeechRecognizerStart)
+    {
+        cout << "Initialize the library first" << endl;
+        return S_FALSE;
+    }
     if (recognizerStatus != SpeechRecognizerMute)
     {
         std::cout << "Please mute the audio first" << std::endl;
@@ -399,17 +416,21 @@ SpeechRecognizer::unmute()
 void
 SpeechRecognizer::release()
 {
+    if (recognizerStatus == SpeechRecognizerStart)
+    {
+        cout << "Initialize the library first" << endl;
+        return;
+    }
 
     recognizerStatus = SpeechRecognizerRelease;
 
     MFShutdown();
-    CoUninitialize();
+    //CoUninitialize();
 
     FinalizeResample();
     FinializeRecognition();
 
-    DestroyStream(sherpaStream);
-    DestroyRecognizer(sherpaRecognizer);
+    removeAllListeners();
 }
 
 void
@@ -579,7 +600,7 @@ SpeechRecognizer::InitializeRecognition()
     sherpaConfig.rule3_min_utterance_length = 300.0f;
     sherpaConfig.sampling_rate = configuration.modelSampleRate;
     sherpaConfig.feature_dim = 80;
-    
+
     config.model_config.tokens = sherpaConfig.tokens.c_str();
     config.model_config.encoder_param = sherpaConfig.encoder_param.c_str();
     config.model_config.encoder_bin = sherpaConfig.encoder_bin.c_str();
@@ -653,8 +674,10 @@ SpeechRecognizer::Recognize(int8_t* sampledBytes, int nBytes, int index)
 HRESULT
 SpeechRecognizer::FinializeRecognition()
 {
-    DestroyStream(sherpaStream);
-    DestroyRecognizer(sherpaRecognizer);
+    if (sherpaStream)
+        DestroyStream(sherpaStream);
+    if (sherpaRecognizer)
+        DestroyRecognizer(sherpaRecognizer);
     sherpaStream = NULL;
     sherpaRecognizer = NULL;
     return S_OK;
@@ -726,7 +749,7 @@ SpeechRecognizer::recognizeFromFile(const char* wavfileName)
 }
 
 
-HRESULT 
+HRESULT
 SpeechRecognizer::ConvertWavToAac(LPCWSTR wavFilePath, LPCWSTR aacFilePath)
 {
     IMFSourceReader* pReader = NULL;

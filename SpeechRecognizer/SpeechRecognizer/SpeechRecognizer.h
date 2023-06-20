@@ -94,6 +94,7 @@ struct WavHeader {
 };
 
 enum SpeechRecognizerStatus {
+    SpeechRecognizerStart,
     SpeechRecognizerNormal,
     SpeechRecognizerListen,
     SpeechRecognizerMute,

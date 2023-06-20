@@ -55,12 +55,14 @@ struct WavHeader {
 };
 
 enum SpeechRecognizerStatus {
+    SpeechRecognizerStart,
     SpeechRecognizerNormal,
     SpeechRecognizerListen,
     SpeechRecognizerMute,
     SpeechRecognizerRelease
 };
 
+// This class is exported from the dll
 class SpeechRecognizer
 {
 public:
@@ -69,7 +71,7 @@ public:
     SpeechRecognizer(Configuration config);
     SpeechRecognizer(Configuration config, std::string speechText, std::string recordingId);
     ~SpeechRecognizer();
-    
+
     // Start to listen audio
     HRESULT listen();
 
