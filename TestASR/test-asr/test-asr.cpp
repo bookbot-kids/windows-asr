@@ -10,13 +10,13 @@ using namespace std;
 #include "SpeechRecognizer.h"
 
 
-void displayRecognition1(const std::string& str)
+void displayRecognition1(const std::string& str, bool isEndpoint)
 {
-	cout << " displayRecognition1 -> " << str << endl;
+	cout << " displayRecognition1 -> " << str << isEndpoint << endl;
 }
-void displayRecognition2(const std::string& str)
+void displayRecognition2(const std::string& str, bool isEndpoint)
 {
-	cout << " displayRecognition2 -> " << str << endl;
+	cout << " displayRecognition2 -> " << str << isEndpoint << endl;
 }
 
 int main()
@@ -27,13 +27,13 @@ int main()
 	cout << "Welcome to our Windows-ASR" << endl;
 
 	Configuration config;
-	config.modelDir = "E:\\asrmodel\\";
-	config.recordingDir = "E:\\recordings\\";
+	config.modelDir = "C:\\asrmodel\\";
+	config.recordingDir = "C:\\recordings\\";
 	config.modelSampleRate = 16000;
 
 	std::unique_ptr<SpeechRecognizer> recognizer = std::make_unique<SpeechRecognizer>(config);
 
-	recognizer->initialize("MyRecording1");
+	recognizer->initialize("MyRecording1", "");
 
 	recognizer->addListener(displayRecognition1);
 	recognizer->addListener(displayRecognition2);

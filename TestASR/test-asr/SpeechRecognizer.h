@@ -94,6 +94,7 @@ struct WavHeader {
 };
 
 enum SpeechRecognizerStatus {
+    SpeechRecognizerStart,
     SpeechRecognizerNormal,
     SpeechRecognizerListen,
     SpeechRecognizerMute,
@@ -124,7 +125,7 @@ public:
     HRESULT unmute();
 
     // Setup microphone and ASR model
-    HRESULT initialize(std::string recordingId); // set recordingId property
+    HRESULT initialize(std::string recordingId, std::string recordingPath_s); // set recordingId property
 
     // Release all resources
     void release();
@@ -136,10 +137,10 @@ public:
     void flushSpeech(std::string speechText); // set speech text property
 
     // Add a callback to receive string value from ASR
-    void addListener(const std::function<void(const std::string&)>& listener);
+    void addListener(const std::function<void(const std::string&, bool)>& listener);
 
     // Remove a callback ASR
-    void removeListener(const std::function<void(const std::string&)>& listener);
+    void removeListener(const std::function<void(const std::string&, bool)>& listener);
 
     // Clear all listeners
     void removeAllListeners();
@@ -155,9 +156,10 @@ private:
     Configuration configuration;
     std::string speechText;
     std::string recordingId;
+    std::string recordingPath;
     SpeechRecognizerStatus recognizerStatus;
 
-    vector < std::function<void(const std::string&)> > recogCallbackList;
+    vector < std::function<void(const std::string&, bool)> > recogCallbackList;
 private:
     // resample variables and functions
     WWMFResampler iResampler;
