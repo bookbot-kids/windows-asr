@@ -475,7 +475,10 @@ SpeechRecognizer::removeListener(const std::function<void(const std::string&, bo
 
     for (auto it = recogCallbackList.begin(); it != recogCallbackList.end(); it++) {
         if (getAddress(*it) == getAddress(listener)) {
-            recogCallbackList.erase(it);
+            it = recogCallbackList.erase(it);
+        }
+        else {
+            ++it;
         }
     }
 }
