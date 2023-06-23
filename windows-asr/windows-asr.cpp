@@ -49,11 +49,11 @@ using namespace std;
 #pragma comment(lib, "wmcodecdspuuid.lib")
 
 
-void displayRecognition1(const std::string& str)
+void displayRecognition1(const std::string& str, bool b)
 {
 	cout << " displayRecognition1 -> " << str << endl;
 }
-void displayRecognition2(const std::string& str)
+void displayRecognition2(const std::string& str, bool b)
 {
 	cout << " displayRecognition2 -> " << str << endl;
 }
@@ -68,10 +68,11 @@ int main()
 	config.modelDir = "E:\\asrmodel\\";
 	config.recordingDir = "E:\\recordings\\";
 	config.modelSampleRate = 16000;
+	config.recordSherpaAudio = true;
 
 	SpeechRecognizer recognizer(config);
 
-	recognizer.initialize("MyRecording1");
+	recognizer.initialize("MyRecording1", "abcd");
 
 	recognizer.addListener(displayRecognition1);
 	recognizer.addListener(displayRecognition2);

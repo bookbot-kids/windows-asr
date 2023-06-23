@@ -48,6 +48,7 @@ SpeechRecognizer::SpeechRecognizer()
     configuration.modelDir = "";
     configuration.modelSampleRate = 16000;
     configuration.recordingDir = "";
+    configuration.recordSherpaAudio = false;
 
     recognizerStatus = SpeechRecognizerStart;
 }
@@ -61,6 +62,7 @@ SpeechRecognizer::SpeechRecognizer(Configuration config)
     configuration.modelDir = config.modelDir;
     configuration.modelSampleRate = config.modelSampleRate;
     configuration.recordingDir = config.recordingDir;
+    configuration.recordSherpaAudio = config.recordSherpaAudio;
 
     recognizerStatus = SpeechRecognizerStart;
 }
@@ -74,6 +76,7 @@ SpeechRecognizer::SpeechRecognizer(Configuration config, std::string speechText_
     configuration.modelDir = config.modelDir;
     configuration.modelSampleRate = config.modelSampleRate;
     configuration.recordingDir = config.recordingDir;
+    configuration.recordSherpaAudio = config.recordSherpaAudio;
 
     recognizerStatus = SpeechRecognizerStart;
 }
@@ -120,6 +123,7 @@ SpeechRecognizer::initialize(std::string recordingId_s, std::string recordingPat
     }
 
     WaveHdrList.clear();
+    WaveHdrSherpaList.clear();
 
     //recogThread = std::thread(&SpeechRecognizer::ProcessResampleRecogThread, this);
 
@@ -165,6 +169,20 @@ static void CALLBACK RecordingWavInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInst
             if (hr != S_OK)
             {
                 cout << "Recognition failed " << endl;
+            }
+
+            if (speechRecognizer->isSerpaRecording())
+            {
+                WAVEHDR* WaveHdrSerpa = new WAVEHDR;
+                BYTE* buffer = new BYTE[nBytes];
+                memcpy(buffer, sampleBytes, nBytes);
+                WaveHdrSerpa->lpData = (LPSTR)buffer;
+                WaveHdrSerpa->dwBufferLength = nBytes;
+                WaveHdrSerpa->dwBytesRecorded = nBytes;
+                WaveHdrSerpa->dwUser = 0L;
+                WaveHdrSerpa->dwFlags = 0L;
+                WaveHdrSerpa->dwLoops = 0L;
+                speechRecognizer->WaveHdrSherpaList.push_back(WaveHdrSerpa);
             }
 
             auto end = std::chrono::high_resolution_clock::now();
@@ -242,6 +260,7 @@ SpeechRecognizer::listen()
         return S_FALSE;
     }
 
+    WaveHdrList.clear();
 
     return S_OK;
 }
@@ -339,7 +358,11 @@ SpeechRecognizer::stopListening()
     for (auto it = WaveHdrList.begin(); it != WaveHdrList.end(); ++it) {
         WAVEHDR* wavHdr = (WAVEHDR*)*it;
         outfileaac << std::string((const char*)wavHdr->lpData, (const char*)wavHdr->lpData + wavHdr->dwBytesRecorded);
+
+        if (wavHdr->lpData)
+            delete wavHdr->lpData;
     }
+    WaveHdrList.clear();
 
     outfileaac.close();
 
@@ -347,6 +370,33 @@ SpeechRecognizer::stopListening()
     std::string filenameAAC = configuration.recordingDir + recordingPath + recordingId + "_" + std::to_string(value.count()) + ".aac";
 
     ConvertWavToAac(ConvertToLPCWSTR(filenameWAV), ConvertToLPCWSTR(filenameAAC));
+
+    if (configuration.recordSherpaAudio)
+    {
+        std::string filenameSherpa = configuration.recordingDir + recordingPath + recordingId + "_" + std::to_string(value.count()) + "_sherpa.wav";
+        totlRecordSize = 0;
+        for (auto it = WaveHdrSherpaList.begin(); it != WaveHdrSherpaList.end(); ++it) {
+            WAVEHDR* wavHdr = (WAVEHDR*)*it;
+            totlRecordSize += wavHdr->dwBytesRecorded;
+        }
+
+        wh.nSamplesPerSec = TARGET_SAMPLE_RATE;
+        wh.pcmbytes = totlRecordSize;
+        wh.bytes = wh.pcmbytes + 36;
+
+        std::ofstream outfilesherpa(filenameSherpa, ios::binary | ios::trunc);
+
+        outfilesherpa << std::string((const char*)&wh, (const char*)&wh + sizeof(WavHeader));
+        for (auto it = WaveHdrSherpaList.begin(); it != WaveHdrSherpaList.end(); ++it) {
+            WAVEHDR* wavHdr = (WAVEHDR*)*it;
+            outfilesherpa << std::string((const char*)wavHdr->lpData, (const char*)wavHdr->lpData + wavHdr->dwBytesRecorded);
+
+            if (wavHdr->lpData)
+                delete wavHdr->lpData;
+        }
+        WaveHdrSherpaList.clear();
+        outfilesherpa.close();
+    }
 
     return S_OK;
 }
@@ -695,6 +745,12 @@ SpeechRecognizerStatus
 SpeechRecognizer::getRecognizerStatus()
 {
     return recognizerStatus;
+}
+
+bool
+SpeechRecognizer::isSerpaRecording()
+{
+    return configuration.recordSherpaAudio;
 }
 
 void

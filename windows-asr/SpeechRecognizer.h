@@ -10,11 +10,12 @@
 #include "c-api.h"
 
 using namespace std;
-
+#pragma warning(disable: 4251)
 struct Configuration {
     std::string modelDir; // model folder path
     int modelSampleRate; // default 16khz
     std::string recordingDir; //folder to save aac recording
+    bool recordSherpaAudio; // turn on/off recording sherpa audio
 };
 
 struct SherpaConfig {
@@ -85,7 +86,7 @@ public:
     HRESULT unmute();
 
     // Setup microphone and ASR model
-    HRESULT initialize(std::string recordingId); // set recordingId property
+    HRESULT initialize(std::string recordingId, std::string recordingPath_s); // set recordingId property
 
     // Release all resources
     void release();
@@ -97,10 +98,10 @@ public:
     void flushSpeech(std::string speechText); // set speech text property
 
     // Add a callback to receive string value from ASR
-    void addListener(const std::function<void(const std::string&)>& listener);
+    void addListener(const std::function<void(const std::string&, bool)>& listener);
 
     // Remove a callback ASR
-    void removeListener(const std::function<void(const std::string&)>& listener);
+    void removeListener(const std::function<void(const std::string&, bool)>& listener);
 
     // Clear all listeners
     void removeAllListeners();
@@ -116,9 +117,10 @@ private:
     Configuration configuration;
     std::string speechText;
     std::string recordingId;
+    std::string recordingPath;
     SpeechRecognizerStatus recognizerStatus;
 
-    vector < std::function<void(const std::string&)> > recogCallbackList;
+    vector < std::function<void(const std::string&, bool)> > recogCallbackList;
 private:
     // resample variables and functions
     WWMFResampler iResampler;
@@ -142,7 +144,9 @@ public:
     int curRecogBockIndex;
     HWAVEIN hWaveIn;
     list < WAVEHDR*> WaveHdrList;
+    list < WAVEHDR*> WaveHdrSherpaList;
     SpeechRecognizerStatus getRecognizerStatus();
+    bool isSerpaRecording();
     HRESULT Resample(BYTE* Block, int nBytes, BYTE* SampleBlock, int* nSampleBytes);
     HRESULT Recognize(int8_t* sampledBytes, int nBytes, int index);
 };

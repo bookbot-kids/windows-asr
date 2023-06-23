@@ -54,6 +54,7 @@ struct Configuration {
     std::string modelDir; // model folder path
     int modelSampleRate; // default 16khz
     std::string recordingDir; //folder to save aac recording
+    bool recordSherpaAudio; // turn on/off recording sherpa audio
 };
 
 struct SherpaConfig {
@@ -183,7 +184,9 @@ public:
     int curRecogBockIndex;
     HWAVEIN hWaveIn;
     list < WAVEHDR*> WaveHdrList;
+    list < WAVEHDR*> WaveHdrSherpaList;
     SpeechRecognizerStatus getRecognizerStatus();
+    bool isSerpaRecording();
     HRESULT Resample(BYTE* Block, int nBytes, BYTE* SampleBlock, int* nSampleBytes);
     HRESULT Recognize(int8_t* sampledBytes, int nBytes, int index);
 };
