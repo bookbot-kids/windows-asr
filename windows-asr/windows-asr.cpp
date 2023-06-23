@@ -93,14 +93,15 @@ int main()
 
 	recognizer.resetSpeech();
 	recognizer.unmute();
-
 #endif
+
 	cout << "Recording and Recognize now ... press Any key to Stop ..." << endl;
 	ch = getchar();
 
 	recognizer.stopListening();
 
-	//recognizer.recognizeFromFile("recording.wav");
+
+	//recognizer.recognizeAudio("E:\\recordings\\MyRecording1_1687507499091_sherpa.wav", "E:\\recordings\\");
 
 	recognizer.release();
 }

@@ -372,7 +372,7 @@ SpeechRecognizer::stopListening()
 
     if (configuration.recordSherpaAudio)
     {
-        std::string filenameSherpa = configuration.recordingDir + recordingPath + recordingId + "_" + std::to_string(value.count()) + "_sherpa.wav";
+        std::string filenameSherpa = configuration.recordingDir + recordingPath + recordingId + "_sherpa_" + std::to_string(value.count()) + ".wav";
         totlRecordSize = 0;
         for (auto it = WaveHdrSherpaList.begin(); it != WaveHdrSherpaList.end(); ++it) {
             WAVEHDR* wavHdr = (WAVEHDR*)*it;
@@ -759,9 +759,9 @@ SpeechRecognizer::ProcessResampleRecogThread()
 }
 
 void
-SpeechRecognizer::recognizeFromFile(const char* wavfileName)
+SpeechRecognizer::recognizeAudio(std::string audio_path, std::string output_path)
 {
-    const char* wav_filename = wavfileName;
+    const char* wav_filename = audio_path.c_str();
     FILE* fp = NULL;
     fopen_s(&fp, wav_filename, "rb");
     if (!fp) {
@@ -781,19 +781,16 @@ SpeechRecognizer::recognizeFromFile(const char* wavfileName)
 
     int32_t segment_id = -1;
 
-    std::ofstream output("samples", ios::trunc);
+    std::string outputFile = output_path + "output.txt";
+    std::ofstream output(outputFile, ios::trunc);
 
     while (!feof(fp)) {
         size_t n = fread((void*)buffer, sizeof(int8_t), RECOG_BLOCK_SIZ * 2, fp);
         if (n > 0) {
             int sampleCount = 0;
             for (size_t i = 0; i < n; i += 2, sampleCount++) {
-                //samples[sampleCount] = ((static_cast<int16_t>(buffer[i + 1]) << 8) | (uint8_t)buffer[i]) / 32768.;
                 samples[sampleCount] = ((static_cast<int16_t>(buffer[i + 1]) << 8) | (uint8_t)buffer[i]) / 32768.f;
-                //samples[sampleCount] = (buffer[i]) / 32768.;
-                output << ((static_cast<int16_t>(buffer[i + 1]) << 8) | (uint8_t)buffer[i]) << ' ' << (uint16_t)buffer[i + 1] << ' ' << (uint16_t)buffer[i] << endl;
             }
-            output << "aaaaaaaa" << endl;
 
             AcceptWaveform(sherpaStream, 16000, samples, sampleCount);
             while (IsReady(sherpaRecognizer, sherpaStream)) {
@@ -802,13 +799,13 @@ SpeechRecognizer::recognizeFromFile(const char* wavfileName)
 
             SherpaNcnnResult* r = GetResult(sherpaRecognizer, sherpaStream);
             if (strlen(r->text)) {
-                cout << r->text << endl;
+                output << r->text << endl;
             }
             DestroyResult(r);
         }
     }
     fclose(fp);
-    fprintf(stderr, "\n");
+    output.close();
 }
 
 

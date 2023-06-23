@@ -107,7 +107,7 @@ public:
     void removeAllListeners();
 
     // Recognize from file
-    void recognizeFromFile(const char*);
+    void recognizeAudio(std::string audio_path, std::string output_path);
 
     // Convert wav to aac 
     HRESULT ConvertWavToAac(LPCWSTR inputFilePath, LPCWSTR outputFilePath);
