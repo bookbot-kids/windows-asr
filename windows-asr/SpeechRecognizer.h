@@ -149,5 +149,7 @@ public:
     bool isSerpaRecording();
     HRESULT Resample(BYTE* Block, int nBytes, BYTE* SampleBlock, int* nSampleBytes);
     HRESULT Recognize(int8_t* sampledBytes, int nBytes, int index);
+
+    std::list <WAVEHDR* >::iterator recogIt;
 };
 

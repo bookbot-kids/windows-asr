@@ -36,7 +36,7 @@ int main()
 	std::unique_ptr<SpeechRecognizer> recognizer = std::make_unique<SpeechRecognizer>(config);
 
 	recognizer->initialize("MyRecording1", "");
-#if 0
+
 	recognizer->addListener(displayRecognition1);
 	recognizer->addListener(displayRecognition2);
 	recognizer->removeListener(displayRecognition1);
@@ -47,7 +47,7 @@ int main()
 	ch = getchar();
 
 	recognizer->listen();
-
+#if 0
 
 	Sleep(5000);
 
@@ -57,12 +57,12 @@ int main()
 	recognizer.resetSpeech();
 	recognizer.unmute();
 
-
+#endif
 	cout << "Recording and Recognize now ... press Any key to Stop ..." << endl;
 	ch = getchar();
 
 	recognizer->stopListening();
-#endif
-	recognizer->recognizeAudio("E:\\recordings\\MyRecording1_1687507499091_sherpa.wav", "E:\\recordings\\");
+
+	//recognizer->recognizeAudio("E:\\recordings\\MyRecording1_1687507499091_sherpa.wav", "E:\\recordings\\");
 
 }
