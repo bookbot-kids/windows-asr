@@ -772,7 +772,11 @@ SpeechRecognizer::ProcessResampleRecogThread()
         std::list <WAVEHDR* >::iterator tempIt;
         tempIt = recogIt;
 
-        if (*recogIt == NULL || ++tempIt == WaveHdrSherpaList.end()) {
+        if (*recogIt == NULL || recogIt._Ptr == NULL) {
+            Sleep(10);
+            continue;
+        }
+        if (++tempIt == WaveHdrSherpaList.end()) {
             Sleep(10);
             continue;
         }
