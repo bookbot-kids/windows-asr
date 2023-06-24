@@ -172,7 +172,7 @@ static void CALLBACK RecordingWavInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInst
             
             WAVEHDR* WaveHdrSerpa = new WAVEHDR;
             BYTE* sherpaBuffer = new BYTE[nBytes];
-            memcpy(buffer, sampleBytes, nBytes);
+            memcpy(sherpaBuffer, sampleBytes, nBytes);
             WaveHdrSerpa->lpData = (LPSTR)sherpaBuffer;
             WaveHdrSerpa->dwBufferLength = nBytes;
             WaveHdrSerpa->dwBytesRecorded = nBytes;

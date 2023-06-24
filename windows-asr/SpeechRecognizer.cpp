@@ -171,7 +171,7 @@ static void CALLBACK RecordingWavInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInst
             
             WAVEHDR* WaveHdrSerpa = new WAVEHDR;
             BYTE* sherpaBuffer = new BYTE[nBytes];
-            memcpy(buffer, sampleBytes, nBytes);
+            memcpy(sherpaBuffer, sampleBytes, nBytes);
             WaveHdrSerpa->lpData = (LPSTR)sherpaBuffer;
             WaveHdrSerpa->dwBufferLength = nBytes;
             WaveHdrSerpa->dwBytesRecorded = nBytes;
@@ -179,7 +179,6 @@ static void CALLBACK RecordingWavInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInst
             WaveHdrSerpa->dwFlags = 0L;
             WaveHdrSerpa->dwLoops = 0L;
             speechRecognizer->WaveHdrSherpaList.push_back(WaveHdrSerpa);
-
                 
             if (speechRecognizer->WaveHdrSherpaList.size() == 1)
             {
@@ -774,11 +773,12 @@ SpeechRecognizer::ProcessResampleRecogThread()
         tempIt = recogIt;
 
         if (*recogIt == NULL || ++tempIt == WaveHdrSherpaList.end()) {
-            Sleep(2);
+            Sleep(10);
             continue;
         }
 
         WAVEHDR* wavHdr = (WAVEHDR*)*recogIt;
+        
         hr = Recognize((int8_t*)wavHdr->lpData, wavHdr->dwBytesRecorded, curRecogBockIndex);
         
         if (hr != S_OK)
