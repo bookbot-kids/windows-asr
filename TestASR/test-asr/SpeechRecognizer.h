@@ -148,6 +148,15 @@ public:
     // Clear all listeners
     void removeAllListeners();
 
+    // Add a callback to receive volume level
+    void addLevelListener(const std::function<void(float)>& listener);
+
+    // Remove a callback level
+    void removeLevelListener(const std::function<void(float)>& listener);
+
+    // Clear all levels listeners
+    void removeAllLevelListeners();
+
     // Recognize from file
     void recognizeAudio(std::string audio_path, std::string output_path);
 
@@ -163,6 +172,7 @@ private:
     SpeechRecognizerStatus recognizerStatus;
 
     vector < std::function<void(const std::string&, bool)> > recogCallbackList;
+    vector < std::function<void(float)> > levelCallbackList;
 private:
     // resample variables and functions
     WWMFResampler iResampler;

@@ -534,6 +534,30 @@ SpeechRecognizer::addListener(const std::function<void(const std::string&, bool)
     recogCallbackList.push_back(listener);
 }
 
+void SpeechRecognizer::addLevelListener(const std::function<void(float)>& listener) 
+{
+    levelCallbackList.push_back(listener);
+}
+
+// Remove a callback level
+void SpeechRecognizer::removeLevelListener(const std::function<void(float)>& listener)
+{
+    for (auto it = levelCallbackList.begin(); it != levelCallbackList.end(); it++) {
+        if (getAddress(*it) == getAddress(listener)) {
+            it = levelCallbackList.erase(it);
+        }
+        else {
+            ++it;
+        }
+    }
+}
+
+// Clear all levels listeners
+void SpeechRecognizer::removeAllLevelListeners() 
+{
+    levelCallbackList.clear();
+}
+
 template<typename T, typename... U>
 size_t getAddress(std::function<T(U...)> f) {
     typedef T(fnType)(U...);
@@ -544,8 +568,6 @@ size_t getAddress(std::function<T(U...)> f) {
 void
 SpeechRecognizer::removeListener(const std::function<void(const std::string&, bool)>& listener)
 {
-    //auto it = std::find(recogCallbackList.begin(), recogCallbackList.end(), listener);
-
     for (auto it = recogCallbackList.begin(); it != recogCallbackList.end(); it++) {
         if (getAddress(*it) == getAddress(listener)) {
             it = recogCallbackList.erase(it);
@@ -711,6 +733,14 @@ SpeechRecognizer::InitializeRecognition()
     return S_OK;
 }
 
+float calculateRMS(const float* samples, int nSamples) {
+    float sum = 0.0f;
+    for (int i = 0; i < nSamples; i++) {
+        sum += samples[i] * samples[i];
+    }
+    return sqrt(sum / nSamples);
+}
+
 HRESULT
 SpeechRecognizer::Recognize(int8_t* sampledBytes, int nBytes, int index)
 {
@@ -724,6 +754,11 @@ SpeechRecognizer::Recognize(int8_t* sampledBytes, int nBytes, int index)
 
     for (int i = 0; i < nBytes; i += 2, nSamples++) {
         samples[nSamples] = ((static_cast<int16_t>(sampledBytes[i + 1]) << 8) | (uint8_t)sampledBytes[i]) / 32768.f;
+    }
+
+    float volumeLevel = calculateRMS(samples, nSamples);
+    for (auto& it : levelCallbackList) {
+        it(volumeLevel);
     }
 
     AcceptWaveform(sherpaStream, 16000, samples, nSamples);
