@@ -49,6 +49,7 @@ SpeechRecognizer::SpeechRecognizer()
     configuration.modelSampleRate = 16000;
     configuration.recordingDir = "";
     configuration.recordSherpaAudio = false;
+    configuration.decodeMethod = "greedy_search";
 
     recognizerStatus = SpeechRecognizerStart;
 }
@@ -63,6 +64,7 @@ SpeechRecognizer::SpeechRecognizer(Configuration config)
     configuration.modelSampleRate = config.modelSampleRate;
     configuration.recordingDir = config.recordingDir;
     configuration.recordSherpaAudio = config.recordSherpaAudio;
+    configuration.decodeMethod = config.decodeMethod;
 
     recognizerStatus = SpeechRecognizerStart;
 }
@@ -77,6 +79,7 @@ SpeechRecognizer::SpeechRecognizer(Configuration config, std::string speechText_
     configuration.modelSampleRate = config.modelSampleRate;
     configuration.recordingDir = config.recordingDir;
     configuration.recordSherpaAudio = config.recordSherpaAudio;
+    configuration.decodeMethod = config.decodeMethod;
 
     recognizerStatus = SpeechRecognizerStart;
 }
@@ -668,7 +671,12 @@ SpeechRecognizer::InitializeRecognition()
     sherpaConfig.decoder_bin = configuration.modelDir + "decoder_jit_trace-pnnx.ncnn.bin";
     sherpaConfig.joiner_param = configuration.modelDir + "joiner_jit_trace-pnnx.ncnn.param";
     sherpaConfig.joiner_bin = configuration.modelDir + "joiner_jit_trace-pnnx.ncnn.bin";
-    sherpaConfig.decoding_method = "greedy_search"; // greedy_search or modified_beam_search
+    
+    if (configuration.decodeMethod.empty())
+        sherpaConfig.decoding_method = "greedy_search"; // greedy_search or modified_beam_search
+    else
+        sherpaConfig.decoding_method = configuration.decodeMethod;
+
     sherpaConfig.num_threads = 4;
     sherpaConfig.use_vulkan_compute = 0;
     sherpaConfig.num_active_paths = 4;

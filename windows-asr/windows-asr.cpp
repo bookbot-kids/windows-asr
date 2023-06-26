@@ -69,6 +69,7 @@ int main()
 	config.recordingDir = "E:\\recordings\\";
 	config.modelSampleRate = 16000;
 	config.recordSherpaAudio = true;
+	config.decodeMethod = "modified_beam_search";
 
 	SpeechRecognizer recognizer(config);
 

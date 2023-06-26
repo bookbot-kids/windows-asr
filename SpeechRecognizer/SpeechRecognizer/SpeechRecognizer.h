@@ -53,7 +53,8 @@ using namespace std;
 struct Configuration {
     std::string modelDir; // model folder path
     int modelSampleRate; // default 16khz
-    std::string recordingDir; //folder to save aac recording
+    std::string recordingDir; // folder to save aac recording
+    std::string decodeMethod; // greedy_search or modified_beam_search
     bool recordSherpaAudio; // turn on/off recording sherpa audio
 };
 
