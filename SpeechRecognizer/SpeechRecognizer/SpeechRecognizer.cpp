@@ -844,6 +844,11 @@ SpeechRecognizer::ProcessResampleRecogThread()
 
             WAVEHDR* wavHdr = (WAVEHDR*)*recogIt;
 
+            if (wavHdr->lpData == NULL) {
+                Sleep(10);
+                continue;
+            }
+
             hr = Recognize((int8_t*)wavHdr->lpData, wavHdr->dwBytesRecorded, curRecogBockIndex);
 
             if (hr != S_OK)
