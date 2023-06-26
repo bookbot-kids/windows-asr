@@ -59,6 +59,7 @@ enum SpeechRecognizerStatus {
     SpeechRecognizerStart,
     SpeechRecognizerNormal,
     SpeechRecognizerListen,
+    SpeechRecognizerStopListen,
     SpeechRecognizerMute,
     SpeechRecognizerRelease
 };
@@ -136,7 +137,7 @@ private:
     HRESULT InitializeRecognition();
     HRESULT FinializeRecognition();
 
-    std::thread recogThread;
+    std::thread * recogThread;
     void ProcessResampleRecogThread();
 
 public:

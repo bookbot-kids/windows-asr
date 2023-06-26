@@ -209,6 +209,8 @@ SpeechRecognizer::listen()
         return S_FALSE;
     }
 
+    resetSpeech();
+
     // Configure wave format
     WAVEFORMATEX wfex;
     wfex.wFormatTag = FORMAT_TAG;
@@ -263,10 +265,9 @@ SpeechRecognizer::listen()
 
     WaveHdrList.clear();
     WaveHdrSherpaList.clear();
-
-    recogThread = std::thread(&SpeechRecognizer::ProcessResampleRecogThread, this);
-    
     recogIt = WaveHdrSherpaList.begin();
+
+    recogThread = new std::thread(&SpeechRecognizer::ProcessResampleRecogThread, this);
     return S_OK;
 }
 
@@ -300,7 +301,9 @@ SpeechRecognizer::stopListening()
         return S_FALSE;
     }
 
-    recognizerStatus = SpeechRecognizerNormal;
+    recognizerStatus = SpeechRecognizerStopListen;
+    //recogThread.detach();
+
     if (waveInStop(hWaveIn) != MMSYSERR_NOERROR)
     {
         std::cout << "Failed to stop recording" << std::endl;
@@ -403,7 +406,10 @@ SpeechRecognizer::stopListening()
         outfilesherpa.close();
     }
 
-    recogThread.detach();
+    if (recogThread) {
+        recogThread->join();
+        delete recogThread;
+    }
 
     return S_OK;
 }
@@ -482,6 +488,11 @@ SpeechRecognizer::release()
     {
         cout << "Initialize the library first" << endl;
         return;
+    }
+
+    if (recognizerStatus == SpeechRecognizerListen)
+    {
+        stopListening();
     }
 
     recognizerStatus = SpeechRecognizerRelease;
@@ -765,34 +776,48 @@ SpeechRecognizer::ProcessResampleRecogThread()
 {
     while (1)
     {
-        if (recognizerStatus == SpeechRecognizerRelease)
-            break;
-
-        HRESULT hr;
-        std::list <WAVEHDR* >::iterator tempIt;
-        tempIt = recogIt;
-
-        if (*recogIt == NULL || recogIt._Ptr == NULL) {
-            Sleep(10);
-            continue;
-        }
-        if (++tempIt == WaveHdrSherpaList.end()) {
-            Sleep(10);
-            continue;
-        }
-
-        WAVEHDR* wavHdr = (WAVEHDR*)*recogIt;
-        
-        hr = Recognize((int8_t*)wavHdr->lpData, wavHdr->dwBytesRecorded, curRecogBockIndex);
-        
-        if (hr != S_OK)
+        if (recognizerStatus == SpeechRecognizerListen)
         {
-            cout << "Recognition failed " << endl;
-        }
+            HRESULT hr;
+            std::list <WAVEHDR* >::iterator tempIt;
+            tempIt = recogIt;
 
-        recogIt++;
-        curRecogBockIndex++;
+            if (recogIt._Ptr == NULL) {
+                Sleep(10);
+                continue;
+            }
+
+            if (*recogIt == NULL) {
+                Sleep(10);
+                continue;
+            }
+
+            if (++tempIt == WaveHdrSherpaList.end()) {
+                Sleep(10);
+                continue;
+            }
+
+            WAVEHDR* wavHdr = (WAVEHDR*)*recogIt;
+
+            hr = Recognize((int8_t*)wavHdr->lpData, wavHdr->dwBytesRecorded, curRecogBockIndex);
+
+            if (hr != S_OK)
+            {
+                cout << "Recognition failed " << endl;
+            }
+
+            recogIt++;
+            curRecogBockIndex++;
+        }
+        else if (recognizerStatus == SpeechRecognizerRelease || recognizerStatus == SpeechRecognizerStopListen)
+            break;
+        else {
+            Sleep(10);
+            continue;
+        }
     }
+
+    cout << "Break the thread" << endl;
 }
 
 void

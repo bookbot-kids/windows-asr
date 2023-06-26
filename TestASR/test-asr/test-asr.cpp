@@ -63,6 +63,23 @@ int main()
 
 	recognizer->stopListening();
 
-	//recognizer->recognizeAudio("E:\\recordings\\MyRecording1_1687507499091_sherpa.wav", "E:\\recordings\\");
 
+	//recognizer.recognizeAudio("E:\\recordings\\sample1.wav", "E:\\recordings\\");
+	cout << "press Any key to Record again .... " << endl;
+	ch = getchar();
+	recognizer->listen();
+
+	cout << "Recording and Recognize now ... press Any key to Stop ..." << endl;
+	ch = getchar();
+
+	recognizer->stopListening();
+
+	cout << "press Any key to Record again .... " << endl;
+	ch = getchar();
+	recognizer->listen();
+
+	cout << "Recording and Recognize now ... press Any key to Stop ..." << endl;
+	ch = getchar();
+
+	recognizer->stopListening();
 }

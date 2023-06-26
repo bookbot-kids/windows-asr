@@ -102,6 +102,22 @@ int main()
 
 
 	//recognizer.recognizeAudio("E:\\recordings\\sample1.wav", "E:\\recordings\\");
+	cout << "press Any key to Record again .... " << endl;
+	ch = getchar();
+	recognizer.listen();
 
-	recognizer.release();
+	cout << "Recording and Recognize now ... press Any key to Stop ..." << endl;
+	ch = getchar();
+
+	recognizer.stopListening();
+
+	cout << "press Any key to Record again .... " << endl;
+	ch = getchar();
+	recognizer.listen();
+
+	cout << "Recording and Recognize now ... press Any key to Stop ..." << endl;
+	ch = getchar();
+
+	recognizer.stopListening();
+
 }
