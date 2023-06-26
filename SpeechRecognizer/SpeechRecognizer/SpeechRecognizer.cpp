@@ -528,6 +528,13 @@ SpeechRecognizer::flushSpeech(std::string speechText_s)
     speechText = speechText_s;
 }
 
+template<typename T, typename... U>
+size_t getAddress(std::function<T(U...)> f) {
+    typedef T(fnType)(U...);
+    fnType** fnPointer = f.template target<fnType*>();
+    return (size_t)*fnPointer;
+}
+
 void
 SpeechRecognizer::addListener(const std::function<void(const std::string&, bool)>& listener)
 {
@@ -558,12 +565,6 @@ void SpeechRecognizer::removeAllLevelListeners()
     levelCallbackList.clear();
 }
 
-template<typename T, typename... U>
-size_t getAddress(std::function<T(U...)> f) {
-    typedef T(fnType)(U...);
-    fnType** fnPointer = f.template target<fnType*>();
-    return (size_t)*fnPointer;
-}
 
 void
 SpeechRecognizer::removeListener(const std::function<void(const std::string&, bool)>& listener)
