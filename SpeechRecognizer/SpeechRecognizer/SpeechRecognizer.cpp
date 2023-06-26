@@ -668,7 +668,7 @@ SpeechRecognizer::InitializeRecognition()
     sherpaConfig.decoder_bin = configuration.modelDir + "decoder_jit_trace-pnnx.ncnn.bin";
     sherpaConfig.joiner_param = configuration.modelDir + "joiner_jit_trace-pnnx.ncnn.param";
     sherpaConfig.joiner_bin = configuration.modelDir + "joiner_jit_trace-pnnx.ncnn.bin";
-    sherpaConfig.decoding_method = "modified_beam_search"; // greedy_search
+    sherpaConfig.decoding_method = "greedy_search"; // greedy_search or modified_beam_search
     sherpaConfig.num_threads = 4;
     sherpaConfig.use_vulkan_compute = 0;
     sherpaConfig.num_active_paths = 4;
