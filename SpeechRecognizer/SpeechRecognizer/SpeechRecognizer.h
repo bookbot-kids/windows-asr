@@ -141,10 +141,10 @@ public:
     void flushSpeech(std::string speechText); // set speech text property
 
     // Add a callback to receive string value from ASR
-    void addListener(const std::function<void(const std::string&, bool)>& listener);
+    void addListener(const std::function<void(const std::string&, bool, bool)>& listener);
 
     // Remove a callback ASR
-    void removeListener(const std::function<void(const std::string&, bool)>& listener);
+    void removeListener(const std::function<void(const std::string&, bool, bool)>& listener);
 
     // Clear all listeners
     void removeAllListeners();
@@ -172,7 +172,7 @@ private:
     std::string recordingPath;
     SpeechRecognizerStatus recognizerStatus;
 
-    vector < std::function<void(const std::string&, bool)> > recogCallbackList;
+    vector < std::function<void(const std::string&, bool, bool)> > recogCallbackList;
     vector < std::function<void(float)> > levelCallbackList;
 private:
     // resample variables and functions

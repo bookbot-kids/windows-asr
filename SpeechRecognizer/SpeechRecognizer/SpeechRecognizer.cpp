@@ -539,7 +539,7 @@ size_t getAddress(std::function<T(U...)> f) {
 }
 
 void
-SpeechRecognizer::addListener(const std::function<void(const std::string&, bool)>& listener)
+SpeechRecognizer::addListener(const std::function<void(const std::string&, bool, bool)>& listener)
 {
     recogCallbackList.push_back(listener);
 }
@@ -570,7 +570,7 @@ void SpeechRecognizer::removeAllLevelListeners()
 
 
 void
-SpeechRecognizer::removeListener(const std::function<void(const std::string&, bool)>& listener)
+SpeechRecognizer::removeListener(const std::function<void(const std::string&, bool, bool)>& listener)
 {
     for (auto it = recogCallbackList.begin(); it != recogCallbackList.end(); it++) {
         if (getAddress(*it) == getAddress(listener)) {
@@ -800,11 +800,14 @@ SpeechRecognizer::Recognize(int8_t* sampledBytes, int nBytes, int index)
             [](auto c) { return std::tolower(c); });
 
         for (auto& it : recogCallbackList) {
-            it(recogText, is_endpoint);
+            it(recogText, is_endpoint, false);
         }
     }
 
     if (is_endpoint) {
+        for (auto& it : recogCallbackList) {
+            it(recogText, is_endpoint, true);
+        }
         resetSpeech();
     }
 

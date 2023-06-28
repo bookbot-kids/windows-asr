@@ -10,11 +10,11 @@ using namespace std;
 #include "SpeechRecognizer.h"
 
 
-void displayRecognition1(const std::string& str, bool isEndpoint)
+void displayRecognition1(const std::string& str, bool isEndpoint, bool isReset)
 {
 	cout << " displayRecognition1 -> " << str << isEndpoint << endl;
 }
-void displayRecognition2(const std::string& str, bool isEndpoint)
+void displayRecognition2(const std::string& str, bool isEndpoint, bool isReset)
 {
 	cout << " displayRecognition2 -> " << str << isEndpoint << endl;
 }
