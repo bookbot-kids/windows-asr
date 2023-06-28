@@ -27,10 +27,11 @@ int main()
 	cout << "Welcome to our Windows-ASR" << endl;
 
 	Configuration config;
-	config.modelDir = "E:\\asrmodel\\";
-	config.recordingDir = "E:\\recordings\\";
+	config.modelDir = "C:\\asrmodel\\";
+	config.recordingDir = "C:\\recordings\\";
 	config.modelSampleRate = 16000;
 	config.recordSherpaAudio = true;
+	//config.resultMode = "tokens";
 	
 
 	std::unique_ptr<SpeechRecognizer> recognizer = std::make_unique<SpeechRecognizer>(config);

@@ -50,6 +50,7 @@ SpeechRecognizer::SpeechRecognizer()
     configuration.recordingDir = "";
     configuration.recordSherpaAudio = false;
     configuration.decodeMethod = "greedy_search";
+    configuration.resultMode = "text";
 
     recognizerStatus = SpeechRecognizerStart;
 }
@@ -65,6 +66,7 @@ SpeechRecognizer::SpeechRecognizer(Configuration config)
     configuration.recordingDir = config.recordingDir;
     configuration.recordSherpaAudio = config.recordSherpaAudio;
     configuration.decodeMethod = config.decodeMethod;
+    configuration.resultMode = config.resultMode;
 
     recognizerStatus = SpeechRecognizerStart;
 }
@@ -80,6 +82,7 @@ SpeechRecognizer::SpeechRecognizer(Configuration config, std::string speechText_
     configuration.recordingDir = config.recordingDir;
     configuration.recordSherpaAudio = config.recordSherpaAudio;
     configuration.decodeMethod = config.decodeMethod;
+    configuration.resultMode = config.resultMode;
 
     recognizerStatus = SpeechRecognizerStart;
 }
@@ -772,7 +775,24 @@ SpeechRecognizer::Recognize(int8_t* sampledBytes, int nBytes, int index)
     bool is_endpoint = IsEndpoint(sherpaRecognizer, sherpaStream);
     SherpaNcnnResult* r = GetResult(sherpaRecognizer, sherpaStream);
 
-    std::string recogText(r->text);
+    std::string recogText;
+    if (configuration.resultMode == "tokens") {
+        auto p = r->tokens;
+        auto count = r->count;
+        std::ostringstream oss;
+        for (int32_t i = 0; i < count; ++i) {
+            if (i != 0) {
+                oss << " "; // add a space between tokens
+            }
+            oss << p;
+            p += strlen(p) + 1;
+        }
+
+        recogText = oss.str();
+    }
+    else {
+        recogText = r->text;
+    }
 
     if (!recogText.empty() && lastText != recogText) {
         lastText = recogText;
