@@ -13,8 +13,6 @@
 #include <iomanip>
 #include <algorithm>
 
-
-
 #define FORMAT_TAG          WAVE_FORMAT_PCM                             // Audio Type
 #define NUMBER_OF_CHANNELS  1                                           // Number of channels
 #define BIT_PER_SAMPLE      16                                          // Bit per samples
@@ -685,25 +683,35 @@ SpeechRecognizer::FinalizeResample()
     return S_OK;
 }
 
+bool SpeechRecognizer::IsFileExist(const std::string fileName) 
+{
+    std::ifstream infile(fileName.c_str());
+    return infile.good();
+}
+
 HRESULT
 SpeechRecognizer::InitializeRecognition()
 {
     cout << "Initializing Recognition audio library" << endl;
 
     sherpaConfig.tokens = configuration.modelDir + "tokens.txt";
-    sherpaConfig.encoder_param = configuration.modelDir + "encoder_jit_trace-pnnx.ncnn.param";
-    sherpaConfig.encoder_bin = configuration.modelDir + "encoder_jit_trace-pnnx.ncnn.bin";
-    sherpaConfig.decoder_param = configuration.modelDir + "decoder_jit_trace-pnnx.ncnn.param";
-    sherpaConfig.decoder_bin = configuration.modelDir + "decoder_jit_trace-pnnx.ncnn.bin";
-    sherpaConfig.joiner_param = configuration.modelDir + "joiner_jit_trace-pnnx.ncnn.param";
-    sherpaConfig.joiner_bin = configuration.modelDir + "joiner_jit_trace-pnnx.ncnn.bin";
+    sherpaConfig.encoder_param = configuration.modelDir + "encoder-epoch-30-avg-5-chunk-32-left-128.onnx";
+    sherpaConfig.decoder_param = configuration.modelDir + "decoder-epoch-30-avg-5-chunk-32-left-128.onnx";
+    sherpaConfig.joiner_param = configuration.modelDir + "joiner-epoch-30-avg-5-chunk-32-left-128.onnx";
     
+    // validate paths
+    if (!IsFileExist(sherpaConfig.tokens) || !IsFileExist(sherpaConfig.encoder_param)
+        || !IsFileExist(sherpaConfig.decoder_param) || !IsFileExist(sherpaConfig.joiner_param))
+    {
+        throw std::invalid_argument("invalid model path");
+    }
+
     if (configuration.decodeMethod.empty())
         sherpaConfig.decoding_method = "greedy_search"; // greedy_search or modified_beam_search
     else
         sherpaConfig.decoding_method = configuration.decodeMethod;
 
-    sherpaConfig.num_threads = 4;
+    sherpaConfig.num_threads = 1;
     sherpaConfig.use_vulkan_compute = 0;
     sherpaConfig.num_active_paths = 4;
     sherpaConfig.enable_endpoint = true;
@@ -712,27 +720,28 @@ SpeechRecognizer::InitializeRecognition()
     sherpaConfig.rule3_min_utterance_length = 300.0f;
     sherpaConfig.sampling_rate = (float)configuration.modelSampleRate;
     sherpaConfig.feature_dim = 80;
+    sherpaConfig.provider = "cpu";
+    sherpaConfig.debug = false;
 
     config.model_config.tokens = sherpaConfig.tokens.c_str();
-    config.model_config.encoder_param = sherpaConfig.encoder_param.c_str();
-    config.model_config.encoder_bin = sherpaConfig.encoder_bin.c_str();
-    config.model_config.decoder_param = sherpaConfig.decoder_param.c_str();
-    config.model_config.decoder_bin = sherpaConfig.decoder_bin.c_str();
-    config.model_config.joiner_param = sherpaConfig.joiner_param.c_str();
-    config.model_config.joiner_bin = sherpaConfig.joiner_bin.c_str();
-    config.decoder_config.decoding_method = sherpaConfig.decoding_method.c_str();
-    config.model_config.num_threads = sherpaConfig.num_threads;
-    config.model_config.use_vulkan_compute = sherpaConfig.use_vulkan_compute;
-    config.decoder_config.num_active_paths = sherpaConfig.num_active_paths;
+    config.decoding_method = sherpaConfig.decoding_method.c_str();
+    config.model_config.num_threads = (int32_t)sherpaConfig.num_threads;
     config.enable_endpoint = sherpaConfig.enable_endpoint;
     config.rule1_min_trailing_silence = sherpaConfig.rule1_min_trailing_silence;
     config.rule2_min_trailing_silence = sherpaConfig.rule2_min_trailing_silence;
     config.rule3_min_utterance_length = sherpaConfig.rule3_min_utterance_length;
-    config.feat_config.sampling_rate = sherpaConfig.sampling_rate;
+    config.feat_config.sample_rate = (int32_t)sherpaConfig.sampling_rate;
     config.feat_config.feature_dim = (int32_t)sherpaConfig.feature_dim;
+    config.model_config.encoder = sherpaConfig.encoder_param.c_str();
+    config.model_config.decoder = sherpaConfig.decoder_param.c_str();
+    config.model_config.joiner = sherpaConfig.joiner_param.c_str();
+    config.model_config.debug = sherpaConfig.debug;
+    config.max_active_paths = (int32_t)sherpaConfig.num_active_paths;
+    config.model_config.provider = sherpaConfig.provider.c_str();
 
-    sherpaRecognizer = CreateRecognizer(&config);
-    sherpaStream = CreateStream(sherpaRecognizer);
+
+    sherpaRecognizer = CreateOnlineRecognizer(&config);
+    sherpaStream = CreateOnlineStream(sherpaRecognizer);
 
     return S_OK;
 }
@@ -767,13 +776,13 @@ SpeechRecognizer::Recognize(int8_t* sampledBytes, int nBytes, int index)
 
     AcceptWaveform(sherpaStream, 16000, samples, nSamples);
 
-    while (IsReady(sherpaRecognizer, sherpaStream)) {
-        Decode(sherpaRecognizer, sherpaStream);
+    while (IsOnlineStreamReady(sherpaRecognizer, sherpaStream)) {
+        DecodeOnlineStream(sherpaRecognizer, sherpaStream);
     }
 
     static std::string lastText;
     bool is_endpoint = IsEndpoint(sherpaRecognizer, sherpaStream);
-    SherpaNcnnResult* r = GetResult(sherpaRecognizer, sherpaStream);
+    SherpaOnnxOnlineRecognizerResult* r = GetOnlineStreamResult(sherpaRecognizer, sherpaStream);
 
     std::string recogText;
     if (configuration.resultMode == "tokens") {
@@ -811,7 +820,7 @@ SpeechRecognizer::Recognize(int8_t* sampledBytes, int nBytes, int index)
         resetSpeech();
     }
 
-    DestroyResult(r);
+    DestroyOnlineRecognizerResult(r);
 
     return S_OK;
 }
@@ -820,9 +829,9 @@ HRESULT
 SpeechRecognizer::FinializeRecognition()
 {
     if (sherpaStream)
-        DestroyStream(sherpaStream);
+        DestroyOnlineStream(sherpaStream);
     if (sherpaRecognizer)
-        DestroyRecognizer(sherpaRecognizer);
+        DestroyOnlineRecognizer(sherpaRecognizer);
     sherpaStream = NULL;
     sherpaRecognizer = NULL;
     return S_OK;
@@ -913,7 +922,7 @@ SpeechRecognizer::recognizeAudio(std::string audio_path, std::string output_path
     int8_t buffer[RECOG_BLOCK_SIZ * 2];
     float samples[RECOG_BLOCK_SIZ];
 
-    SherpaNcnnStream* s = CreateStream(sherpaRecognizer);
+    SherpaOnnxOnlineStream* s = CreateOnlineStream(sherpaRecognizer);
 
     int32_t segment_id = -1;
 
@@ -928,15 +937,15 @@ SpeechRecognizer::recognizeAudio(std::string audio_path, std::string output_path
             }
 
             AcceptWaveform(sherpaStream, 16000, samples, sampleCount);
-            while (IsReady(sherpaRecognizer, sherpaStream)) {
-                Decode(sherpaRecognizer, sherpaStream);
+            while (IsOnlineStreamReady(sherpaRecognizer, sherpaStream)) {
+                DecodeOnlineStream(sherpaRecognizer, sherpaStream);
             }
 
-            SherpaNcnnResult* r = GetResult(sherpaRecognizer, sherpaStream);
+            SherpaOnnxOnlineRecognizerResult* r = GetOnlineStreamResult(sherpaRecognizer, sherpaStream);
             if (strlen(r->text)) {
                 output << r->text << endl;
             }
-            DestroyResult(r);
+            DestroyOnlineRecognizerResult(r);
         }
     }
     fclose(fp);

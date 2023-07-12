@@ -27,7 +27,7 @@ int main()
 	cout << "Welcome to our Windows-ASR" << endl;
 
 	Configuration config;
-	config.modelDir = "C:\\asrmodel\\";
+	config.modelDir = "C:\\asrmodel\\asr\\en\\";
 	config.recordingDir = "C:\\recordings\\";
 	config.modelSampleRate = 16000;
 	config.recordSherpaAudio = true;

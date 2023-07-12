@@ -62,12 +62,10 @@ struct Configuration {
 struct SherpaConfig {
     std::string tokens;
     std::string encoder_param;
-    std::string encoder_bin;
     std::string decoder_param;
-    std::string decoder_bin;
     std::string joiner_param;
-    std::string joiner_bin;
     std::string decoding_method;
+    std::string provider;
 
     int num_threads;
     int use_vulkan_compute;
@@ -78,6 +76,7 @@ struct SherpaConfig {
     float rule3_min_utterance_length;
     float sampling_rate;
     float feature_dim;
+    bool debug;
 };
 
 struct WavHeader {
@@ -183,17 +182,18 @@ private:
     HRESULT FinalizeResample();
 
     // recognition variables and functions
-    SherpaNcnnRecognizer* sherpaRecognizer;
-    SherpaNcnnStream* sherpaStream;
+    SherpaOnnxOnlineRecognizer* sherpaRecognizer;
+    SherpaOnnxOnlineStream* sherpaStream;
 
     HRESULT InitializeRecognition();
     HRESULT FinializeRecognition();
 
     std::thread * recogThread;
     void ProcessResampleRecogThread();
+    bool IsFileExist(const std::string fileName);
 
 public:
-    SherpaNcnnRecognizerConfig config;
+    SherpaOnnxOnlineRecognizerConfig config;
     int curRecogBockIndex;
     HWAVEIN hWaveIn;
     list < WAVEHDR*> WaveHdrList;
