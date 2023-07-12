@@ -115,7 +115,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>Ole32.lib;winmm.lib;mfplat.lib;mfuuid.lib;mfreadwrite.lib;wmcodecdspuuid.lib;./lib/debug/sherpa-ncnn-c-api.lib;./lib/debug/sherpa-ncnn-core.lib;./lib/debug/ncnn.lib;./lib/debug/kaldi-native-fbank-core.lib;./lib/debug/portaudio_static_x64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Ole32.lib;winmm.lib;mfplat.lib;mfuuid.lib;mfreadwrite.lib;wmcodecdspuuid.lib;./lib/debug/kaldi-native-fbank-core.lib;./lib/debug/sherpa-onnx-c-api.lib;./lib/debug/sherpa-onnx-core.lib;./lib/debug/sherpa-onnx-portaudio_static.lib;./lib/debug/onnxruntime.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
