@@ -711,7 +711,7 @@ SpeechRecognizer::InitializeRecognition()
     else
         sherpaConfig.decoding_method = configuration.decodeMethod;
 
-    sherpaConfig.num_threads = 1;
+    sherpaConfig.num_threads = 4;
     sherpaConfig.use_vulkan_compute = 0;
     sherpaConfig.num_active_paths = 4;
     sherpaConfig.enable_endpoint = true;
