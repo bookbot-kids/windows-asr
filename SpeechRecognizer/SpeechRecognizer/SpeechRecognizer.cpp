@@ -799,6 +799,12 @@ SpeechRecognizer::Recognize(int8_t* sampledBytes, int nBytes, int index)
 
         recogText = oss.str();
     }
+    else if (configuration.resultMode == "json") {
+        std::ostringstream oss;
+        auto json = r->json;
+        oss << json;
+        recogText = oss.str();
+    }
     else {
         recogText = r->text;
     }
@@ -942,9 +948,35 @@ SpeechRecognizer::recognizeAudio(std::string audio_path, std::string output_path
             }
 
             SherpaOnnxOnlineRecognizerResult* r = GetOnlineStreamResult(sherpaRecognizer, sherpaStream);
-            if (strlen(r->text)) {
-                output << r->text << endl;
+            if (configuration.resultMode == "tokens") {
+                const char* p = r->tokens;
+                auto count = r->count;
+                std::ostringstream oss;
+                if (p) {
+                    for (int32_t i = 0; i < count; ++i) {
+                        if (i != 0) {
+                            oss << " "; // add a space between tokens
+                        }
+                        oss << p;
+                        std::cout << "token " << oss.str() << endl;
+                        p += strlen(p) + 1;
+                    }
+                }                
+
+                output << oss.str() << endl;
             }
+            else if (configuration.resultMode == "json") {
+                std::ostringstream oss;
+                auto json = r->json;
+                oss << json;
+                output << oss.str() << endl;
+            }
+            else {
+                if (strlen(r->text)) {
+                    output << r->text << endl;
+                }
+            }
+            
             DestroyOnlineRecognizerResult(r);
         }
     }

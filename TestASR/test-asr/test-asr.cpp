@@ -31,7 +31,7 @@ int main()
 	config.recordingDir = "C:\\recordings\\";
 	config.modelSampleRate = 16000;
 	config.recordSherpaAudio = true;
-	//config.resultMode = "tokens";
+	config.resultMode = "tokens";
 	
 
 	std::unique_ptr<SpeechRecognizer> recognizer = std::make_unique<SpeechRecognizer>(config);
@@ -43,7 +43,7 @@ int main()
 	recognizer->removeListener(displayRecognition1);
 
 	recognizer->flushSpeech("Hello! Nice to meet you");
-
+	recognizer->recognizeAudio("C:\\recordings\\sample1.wav", "C:\\recordings\\output_sample.txt");
 	cout << "Press Any key to Start recording" << endl;
 	ch = getchar();
 

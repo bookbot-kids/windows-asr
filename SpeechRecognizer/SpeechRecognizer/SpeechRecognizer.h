@@ -56,7 +56,7 @@ struct Configuration {
     std::string recordingDir; // folder to save aac recording
     std::string decodeMethod; // greedy_search or modified_beam_search
     bool recordSherpaAudio; // turn on/off recording sherpa audio
-    std::string resultMode; // text or tokens mode
+    std::string resultMode; // text,tokens or json mode
 };
 
 struct SherpaConfig {
