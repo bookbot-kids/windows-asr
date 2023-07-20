@@ -711,17 +711,18 @@ SpeechRecognizer::InitializeRecognition()
     else
         sherpaConfig.decoding_method = configuration.decodeMethod;
 
-    sherpaConfig.num_threads = 4;
+    sherpaConfig.num_threads = 2;
     sherpaConfig.use_vulkan_compute = 0;
     sherpaConfig.num_active_paths = 4;
     sherpaConfig.enable_endpoint = true;
     sherpaConfig.rule1_min_trailing_silence = 2.4f;
     sherpaConfig.rule2_min_trailing_silence = 1.2f;
-    sherpaConfig.rule3_min_utterance_length = 300.0f;
+    sherpaConfig.rule3_min_utterance_length = 30.0f;
     sherpaConfig.sampling_rate = (float)configuration.modelSampleRate;
     sherpaConfig.feature_dim = 80;
     sherpaConfig.provider = "cpu";
     sherpaConfig.debug = false;
+    sherpaConfig.model_type = "zipformer2";
 
     config.model_config.tokens = sherpaConfig.tokens.c_str();
     config.decoding_method = sherpaConfig.decoding_method.c_str();
@@ -738,6 +739,7 @@ SpeechRecognizer::InitializeRecognition()
     config.model_config.debug = sherpaConfig.debug;
     config.max_active_paths = (int32_t)sherpaConfig.num_active_paths;
     config.model_config.provider = sherpaConfig.provider.c_str();
+    config.model_config.model_type = sherpaConfig.model_type.c_str();
 
 
     sherpaRecognizer = CreateOnlineRecognizer(&config);

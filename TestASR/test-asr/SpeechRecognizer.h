@@ -66,6 +66,7 @@ struct SherpaConfig {
     std::string joiner_param;
     std::string decoding_method;
     std::string provider;
+    std::string model_type;
 
     int num_threads;
     int use_vulkan_compute;

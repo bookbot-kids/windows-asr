@@ -153,7 +153,11 @@
       <AdditionalDependencies>../../x64/Release/SPEECHRECOGNIZER.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy /y /d "$(ProjectDir)onnxruntime.dll" "$(OutDir)"</Command>
+      <Command>xcopy /y /d "$(ProjectDir)onnxruntime.dll" "$(OutDir)"
+xcopy /y /d "$(ProjectDir)kaldi-native-fbank-core.dll" "$(OutDir)"
+xcopy /y /d "$(ProjectDir)sherpa-onnx-c-api.dll" "$(OutDir)"
+xcopy /y /d "$(ProjectDir)sherpa-onnx-core.dll" "$(OutDir)"
+xcopy /y /d "$(ProjectDir)sherpa-onnx-portaudio.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
