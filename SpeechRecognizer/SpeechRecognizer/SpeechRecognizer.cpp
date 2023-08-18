@@ -721,7 +721,7 @@ SpeechRecognizer::InitializeRecognition()
     sherpaConfig.sampling_rate = (float)configuration.modelSampleRate;
     sherpaConfig.feature_dim = 80;
     sherpaConfig.provider = "cpu";
-    sherpaConfig.debug = false;
+    sherpaConfig.debug = true;
     sherpaConfig.model_type = "zipformer2";
 
     config.model_config.tokens = sherpaConfig.tokens.c_str();
@@ -733,9 +733,9 @@ SpeechRecognizer::InitializeRecognition()
     config.rule3_min_utterance_length = sherpaConfig.rule3_min_utterance_length;
     config.feat_config.sample_rate = (int32_t)sherpaConfig.sampling_rate;
     config.feat_config.feature_dim = (int32_t)sherpaConfig.feature_dim;
-    config.model_config.encoder = sherpaConfig.encoder_param.c_str();
-    config.model_config.decoder = sherpaConfig.decoder_param.c_str();
-    config.model_config.joiner = sherpaConfig.joiner_param.c_str();
+    config.model_config.transducer.encoder = sherpaConfig.encoder_param.c_str();
+    config.model_config.transducer.decoder = sherpaConfig.decoder_param.c_str();
+    config.model_config.transducer.joiner = sherpaConfig.joiner_param.c_str();
     config.model_config.debug = sherpaConfig.debug;
     config.max_active_paths = (int32_t)sherpaConfig.num_active_paths;
     config.model_config.provider = sherpaConfig.provider.c_str();
