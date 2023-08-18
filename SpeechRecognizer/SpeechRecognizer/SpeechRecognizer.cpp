@@ -727,7 +727,7 @@ SpeechRecognizer::InitializeRecognition()
     config.model_config.tokens = sherpaConfig.tokens.c_str();
     config.decoding_method = sherpaConfig.decoding_method.c_str();
     config.model_config.num_threads = (int32_t)sherpaConfig.num_threads;
-    config.enable_endpoint = sherpaConfig.enable_endpoint;
+    config.enable_endpoint = (int32_t)sherpaConfig.enable_endpoint;
     config.rule1_min_trailing_silence = sherpaConfig.rule1_min_trailing_silence;
     config.rule2_min_trailing_silence = sherpaConfig.rule2_min_trailing_silence;
     config.rule3_min_utterance_length = sherpaConfig.rule3_min_utterance_length;
@@ -736,7 +736,7 @@ SpeechRecognizer::InitializeRecognition()
     config.model_config.transducer.encoder = sherpaConfig.encoder_param.c_str();
     config.model_config.transducer.decoder = sherpaConfig.decoder_param.c_str();
     config.model_config.transducer.joiner = sherpaConfig.joiner_param.c_str();
-    config.model_config.debug = sherpaConfig.debug;
+    config.model_config.debug = (int32_t)sherpaConfig.debug;
     config.max_active_paths = (int32_t)sherpaConfig.num_active_paths;
     config.model_config.provider = sherpaConfig.provider.c_str();
     config.model_config.model_type = sherpaConfig.model_type.c_str();
