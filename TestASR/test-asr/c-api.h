@@ -89,6 +89,8 @@ SHERPA_ONNX_API typedef struct SherpaOnnxOnlineRecognizerConfig {
   /// Possible values are: greedy_search, modified_beam_search
   const char *decoding_method;
 
+  float context_score;
+
   /// Used only when decoding_method is modified_beam_search
   /// Example value: 4
   int32_t max_active_paths;
@@ -171,6 +173,12 @@ SHERPA_ONNX_API void DestroyOnlineRecognizer(
 ///         DestroyOnlineStream() to free it to avoid memory leak.
 SHERPA_ONNX_API SherpaOnnxOnlineStream *CreateOnlineStream(
     const SherpaOnnxOnlineRecognizer *recognizer);
+
+SHERPA_ONNX_API SherpaOnnxOnlineStream *CreateOnlineStreamWithContext(
+    const SherpaOnnxOnlineRecognizer *recognizer,
+    const int32_t *const *context_list,
+    int32_t num_vectors,
+    const int32_t *vector_sizes);
 
 /// Destroy an online stream.
 ///

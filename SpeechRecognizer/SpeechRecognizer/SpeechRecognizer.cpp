@@ -695,9 +695,9 @@ SpeechRecognizer::InitializeRecognition()
     cout << "Initializing Recognition audio library" << endl;
 
     sherpaConfig.tokens = configuration.modelDir + "tokens.txt";
-    sherpaConfig.encoder_param = configuration.modelDir + "encoder.int8.onnx";
-    sherpaConfig.decoder_param = configuration.modelDir + "decoder.int8.onnx";
-    sherpaConfig.joiner_param = configuration.modelDir + "joiner.int8.onnx";
+    sherpaConfig.encoder_param = configuration.modelDir + "encoder.int8.ort";
+    sherpaConfig.decoder_param = configuration.modelDir + "decoder.int8.ort";
+    sherpaConfig.joiner_param = configuration.modelDir + "joiner.int8.ort";
     
     // validate paths
     if (!IsFileExist(sherpaConfig.tokens) || !IsFileExist(sherpaConfig.encoder_param)
