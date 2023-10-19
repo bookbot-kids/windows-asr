@@ -51,12 +51,28 @@
 using namespace std;
 #pragma warning(disable: 4251)
 struct Configuration {
-    std::string modelDir; // model folder path
-    int modelSampleRate; // default 16khz
-    std::string recordingDir; // folder to save aac recording
-    std::string decodeMethod; // greedy_search or modified_beam_search
-    bool recordSherpaAudio; // turn on/off recording sherpa audio
-    std::string resultMode; // text,tokens or json mode
+    std::string modelDir = ""; // model folder path
+    int modelSampleRate = 16000; // default 16khz
+    std::string recordingDir = ""; // folder to save aac recording
+    std::string decodeMethod = "modified_beam_search"; // greedy_search or modified_beam_search
+    bool recordSherpaAudio = false; // turn on/off recording sherpa audio
+    std::string resultMode = "tokens"; // text,tokens or json mode
+    float rule1 = 2.4f; // rule1_min_trailing_silence
+    float rule2 = 1.5f; // rule2_min_trailing_silence
+    float rule3 = 600.0f; // rule3_min_utterance_length
+    float contextScore = 1.5f; // context score
+    std::string modelType = "zipformer2";
+    std::string provider = "cpu";
+    bool debug = true;
+    float featureDim = 80;
+    bool enableEndPoint = true;
+    int numThreads = 2;
+    int numActivePaths = 4;
+    int useVulkanCompute = 0;
+    std::string tokensName = "tokens.txt";
+    std::string encoderName = "encoder.int8.ort";
+    std::string decoderName = "decoder.int8.ort";
+    std::string joinerName = "joiner.int8.ort";
 };
 
 struct SherpaConfig {
@@ -112,8 +128,8 @@ class SPEECHRECOGNIZER_API SpeechRecognizer
 public:
     // Constructor & Destructor
     SpeechRecognizer();
-    SpeechRecognizer(Configuration config);
-    SpeechRecognizer(Configuration config, std::string speechText, std::string recordingId);
+    SpeechRecognizer(const Configuration& config);
+    SpeechRecognizer(const Configuration& config, std::string speechText, std::string recordingId);
     ~SpeechRecognizer();
 
     // Start to listen audio
@@ -163,6 +179,10 @@ public:
 
     // Convert wav to aac 
     HRESULT ConvertWavToAac(LPCWSTR inputFilePath, LPCWSTR outputFilePath);
+
+    void setContextBiasing(const int32_t* const* context_list,
+        int32_t num_vectors,
+        const int32_t* vector_sizes);
 
 private:
     SherpaConfig sherpaConfig;

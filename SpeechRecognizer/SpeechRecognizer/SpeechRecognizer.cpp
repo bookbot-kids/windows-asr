@@ -42,45 +42,25 @@ SpeechRecognizer::SpeechRecognizer()
     speechText = "";
     recordingId = "0";
     recordingPath = "";
-
-    configuration.modelDir = "";
-    configuration.modelSampleRate = 16000;
-    configuration.recordingDir = "";
-    configuration.recordSherpaAudio = false;
-    configuration.decodeMethod = "greedy_search";
-    configuration.resultMode = "text";
-
     recognizerStatus = SpeechRecognizerStart;
 }
 
-SpeechRecognizer::SpeechRecognizer(Configuration config)
+SpeechRecognizer::SpeechRecognizer(const Configuration& config)
 {
     speechText = "";
     recordingId = "0";
     recordingPath = "";
 
-    configuration.modelDir = config.modelDir;
-    configuration.modelSampleRate = config.modelSampleRate;
-    configuration.recordingDir = config.recordingDir;
-    configuration.recordSherpaAudio = config.recordSherpaAudio;
-    configuration.decodeMethod = config.decodeMethod;
-    configuration.resultMode = config.resultMode;
-
+    configuration = config;
     recognizerStatus = SpeechRecognizerStart;
 }
 
-SpeechRecognizer::SpeechRecognizer(Configuration config, std::string speechText_s, std::string recordingId_s)
+SpeechRecognizer::SpeechRecognizer(const Configuration& config, std::string speechText_s, std::string recordingId_s)
 {
     speechText = speechText_s;
     recordingId = recordingId_s;
     recordingPath = "";
-
-    configuration.modelDir = config.modelDir;
-    configuration.modelSampleRate = config.modelSampleRate;
-    configuration.recordingDir = config.recordingDir;
-    configuration.recordSherpaAudio = config.recordSherpaAudio;
-    configuration.decodeMethod = config.decodeMethod;
-    configuration.resultMode = config.resultMode;
+    configuration = config;
 
     recognizerStatus = SpeechRecognizerStart;
 }
@@ -566,6 +546,13 @@ void SpeechRecognizer::removeAllLevelListeners()
     levelCallbackList.clear();
 }
 
+void SpeechRecognizer::setContextBiasing(const int32_t* const* context_list,
+    int32_t num_vectors,
+    const int32_t* vector_sizes)
+{
+    sherpaStream = CreateOnlineStreamWithContext(sherpaRecognizer, context_list, num_vectors, vector_sizes);
+}
+
 
 void
 SpeechRecognizer::removeListener(const std::function<void(const std::string&, bool, bool)>& listener)
@@ -694,10 +681,10 @@ SpeechRecognizer::InitializeRecognition()
 {
     cout << "Initializing Recognition audio library" << endl;
 
-    sherpaConfig.tokens = configuration.modelDir + "tokens.txt";
-    sherpaConfig.encoder_param = configuration.modelDir + "encoder.int8.ort";
-    sherpaConfig.decoder_param = configuration.modelDir + "decoder.int8.ort";
-    sherpaConfig.joiner_param = configuration.modelDir + "joiner.int8.ort";
+    sherpaConfig.tokens = configuration.modelDir + configuration.tokensName;
+    sherpaConfig.encoder_param = configuration.modelDir + configuration.encoderName;
+    sherpaConfig.decoder_param = configuration.modelDir + configuration.decoderName;
+    sherpaConfig.joiner_param = configuration.modelDir + configuration.joinerName;
     
     // validate paths
     if (!IsFileExist(sherpaConfig.tokens) || !IsFileExist(sherpaConfig.encoder_param)
@@ -711,18 +698,19 @@ SpeechRecognizer::InitializeRecognition()
     else
         sherpaConfig.decoding_method = configuration.decodeMethod;
 
-    sherpaConfig.num_threads = 2;
-    sherpaConfig.use_vulkan_compute = 0;
-    sherpaConfig.num_active_paths = 4;
-    sherpaConfig.enable_endpoint = true;
-    sherpaConfig.rule1_min_trailing_silence = 2.4f;
-    sherpaConfig.rule2_min_trailing_silence = 1.2f;
-    sherpaConfig.rule3_min_utterance_length = 30.0f;
+    sherpaConfig.num_threads = configuration.numThreads;
+    sherpaConfig.use_vulkan_compute = configuration.useVulkanCompute;
+    sherpaConfig.num_active_paths = configuration.numActivePaths;
+    sherpaConfig.enable_endpoint = configuration.enableEndPoint;
+    sherpaConfig.rule1_min_trailing_silence = configuration.rule1;
+    sherpaConfig.rule2_min_trailing_silence = configuration.rule2;
+    sherpaConfig.rule3_min_utterance_length = configuration.rule3;
     sherpaConfig.sampling_rate = (float)configuration.modelSampleRate;
-    sherpaConfig.feature_dim = 80;
-    sherpaConfig.provider = "cpu";
-    sherpaConfig.debug = true;
-    sherpaConfig.model_type = "zipformer2";
+    sherpaConfig.feature_dim = configuration.featureDim;
+    sherpaConfig.provider = configuration.provider;
+    sherpaConfig.debug = configuration.debug;
+    sherpaConfig.model_type = configuration.modelType;
+    config.context_score = configuration.contextScore;
 
     config.model_config.tokens = sherpaConfig.tokens.c_str();
     config.decoding_method = sherpaConfig.decoding_method.c_str();
@@ -739,8 +727,7 @@ SpeechRecognizer::InitializeRecognition()
     config.model_config.debug = (int32_t)sherpaConfig.debug;
     config.max_active_paths = (int32_t)sherpaConfig.num_active_paths;
     config.model_config.provider = sherpaConfig.provider.c_str();
-    config.model_config.model_type = sherpaConfig.model_type.c_str();
-
+    config.model_config.model_type = sherpaConfig.model_type.c_str();    
 
     sherpaRecognizer = CreateOnlineRecognizer(&config);
     sherpaStream = CreateOnlineStream(sherpaRecognizer);
