@@ -682,50 +682,34 @@ SpeechRecognizer::InitializeRecognition()
 {
     cout << "Initializing Recognition audio library" << endl;
 
-    sherpaConfig.tokens = configuration.modelDir + configuration.tokensName;
-    sherpaConfig.encoder_param = configuration.modelDir + configuration.encoderName;
-    sherpaConfig.decoder_param = configuration.modelDir + configuration.decoderName;
-    sherpaConfig.joiner_param = configuration.modelDir + configuration.joinerName;
     
     // validate paths
-    if (!IsFileExist(sherpaConfig.tokens) || !IsFileExist(sherpaConfig.encoder_param)
-        || !IsFileExist(sherpaConfig.decoder_param) || !IsFileExist(sherpaConfig.joiner_param))
+    if (!IsFileExist(configuration.tokensPath()) || !IsFileExist(configuration.encoderPath())
+        || !IsFileExist(configuration.decoderPath()) || !IsFileExist(configuration.joinerPath()))
     {
         throw std::invalid_argument("invalid model path");
     }
         
-    sherpaConfig.decoding_method = configuration.decodeMethod;
-    sherpaConfig.num_threads = configuration.numThreads;
-    sherpaConfig.use_vulkan_compute = configuration.useVulkanCompute;
-    sherpaConfig.num_active_paths = configuration.numActivePaths;
-    sherpaConfig.enable_endpoint = configuration.enableEndPoint;
-    sherpaConfig.rule1_min_trailing_silence = configuration.rule1;
-    sherpaConfig.rule2_min_trailing_silence = configuration.rule2;
-    sherpaConfig.rule3_min_utterance_length = configuration.rule3;
-    sherpaConfig.sampling_rate = (float)configuration.modelSampleRate;
-    sherpaConfig.feature_dim = configuration.featureDim;
-    sherpaConfig.provider = configuration.provider;
-    sherpaConfig.debug = configuration.debug;
-    sherpaConfig.model_type = configuration.modelType;
     config.context_score = configuration.contextScore;
 
-    config.model_config.tokens = sherpaConfig.tokens.c_str();
-    config.decoding_method = sherpaConfig.decoding_method.c_str();
-    config.model_config.num_threads = (int32_t)sherpaConfig.num_threads;
-    config.enable_endpoint = (int32_t)sherpaConfig.enable_endpoint;
-    config.rule1_min_trailing_silence = sherpaConfig.rule1_min_trailing_silence;
-    config.rule2_min_trailing_silence = sherpaConfig.rule2_min_trailing_silence;
-    config.rule3_min_utterance_length = sherpaConfig.rule3_min_utterance_length;
-    config.feat_config.sample_rate = (int32_t)sherpaConfig.sampling_rate;
-    config.feat_config.feature_dim = (int32_t)sherpaConfig.feature_dim;
-    config.model_config.transducer.encoder = sherpaConfig.encoder_param.c_str();
-    config.model_config.transducer.decoder = sherpaConfig.decoder_param.c_str();
-    config.model_config.transducer.joiner = sherpaConfig.joiner_param.c_str();
-    config.model_config.debug = (int32_t)sherpaConfig.debug;
-    config.max_active_paths = (int32_t)sherpaConfig.num_active_paths;
-    config.model_config.provider = sherpaConfig.provider.c_str();
-    config.model_config.model_type = sherpaConfig.model_type.c_str();    
+    config.model_config.tokens = configuration.tokensPath().c_str();
+    config.decoding_method = configuration.decodeMethod.c_str();
+    config.model_config.num_threads = (int32_t)configuration.numThreads;
+    config.enable_endpoint = (int32_t)configuration.enableEndPoint;
+    config.rule1_min_trailing_silence = configuration.rule1;
+    config.rule2_min_trailing_silence = configuration.rule2;
+    config.rule3_min_utterance_length = configuration.rule3;
+    config.feat_config.sample_rate = (int32_t)configuration.modelSampleRate;
+    config.feat_config.feature_dim = (int32_t)configuration.featureDim;
+    config.model_config.transducer.encoder = configuration.encoderPath().c_str();
+    config.model_config.transducer.decoder = configuration.decoderPath().c_str();
+    config.model_config.transducer.joiner = configuration.joinerPath().c_str();
+    config.model_config.debug = (int32_t)configuration.debug;
+    config.max_active_paths = (int32_t)configuration.numActivePaths;
+    config.model_config.provider = configuration.provider.c_str();
+    config.model_config.model_type = configuration.modelType.c_str();
 
+    cout << "Configuration:\n" << configuration << endl;
     cout << "Initializing Recognition create recognizer" << endl;
     sherpaRecognizer = CreateOnlineRecognizer(&config);
 

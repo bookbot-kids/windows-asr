@@ -73,27 +73,48 @@ struct Configuration {
     std::string encoderName = "encoder.int8.ort";
     std::string decoderName = "decoder.int8.ort";
     std::string joinerName = "joiner.int8.ort";
-};
 
-struct SherpaConfig {
-    std::string tokens;
-    std::string encoder_param;
-    std::string decoder_param;
-    std::string joiner_param;
-    std::string decoding_method;
-    std::string provider;
-    std::string model_type;
+    std::string tokensPath() {
+        return modelDir + tokensName;
+    }
 
-    int num_threads;
-    int use_vulkan_compute;
-    int num_active_paths;
-    bool enable_endpoint;
-    float rule1_min_trailing_silence;
-    float rule2_min_trailing_silence;
-    float rule3_min_utterance_length;
-    float sampling_rate;
-    float feature_dim;
-    bool debug;
+    std::string encoderPath() {
+        return modelDir + encoderName;
+    }
+
+    std::string decoderPath() {
+        return modelDir + decoderName;
+    }
+
+    std::string joinerPath() {
+        return modelDir + joinerName;
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const Configuration& config) {
+        os << "modelDir = " << config.modelDir << "\n";
+        os << "modelSampleRate = " << config.modelSampleRate << "\n";
+        os << "recordingDir = " << config.recordingDir << "\n";
+        os << "decodeMethod = " << config.decodeMethod << "\n";
+        os << "recordSherpaAudio = " << config.recordSherpaAudio << "\n";
+        os << "resultMode = " << config.resultMode << "\n";
+        os << "rule1 = " << config.rule1 << "\n";
+        os << "rule2 = " << config.rule2 << "\n";
+        os << "rule3 = " << config.rule3 << "\n";
+        os << "contextScore = " << config.contextScore << "\n";
+        os << "modelType = " << config.modelType << "\n";
+        os << "provider = " << config.provider << "\n";
+        os << "debug = " << config.debug << "\n";
+        os << "featureDim = " << config.featureDim << "\n";
+        os << "enableEndPoint = " << config.enableEndPoint << "\n";
+        os << "numThreads = " << config.numThreads << "\n";
+        os << "numActivePaths = " << config.numActivePaths << "\n";
+        os << "useVulkanCompute = " << config.useVulkanCompute << "\n";
+        os << "tokensName = " << config.tokensName << "\n";
+        os << "encoderName = " << config.encoderName << "\n";
+        os << "decoderName = " << config.decoderName << "\n";
+        os << "joinerName = " << config.joinerName << "\n";
+        return os;
+    }
 };
 
 struct WavHeader {
@@ -185,7 +206,6 @@ public:
         const int32_t* vector_sizes);
 
 private:
-    SherpaConfig sherpaConfig;
     Configuration configuration;
     std::string speechText;
     std::string recordingId;
