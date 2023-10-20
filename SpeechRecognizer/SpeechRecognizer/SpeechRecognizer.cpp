@@ -681,18 +681,24 @@ HRESULT
 SpeechRecognizer::InitializeRecognition()
 {
     cout << "Initializing Recognition audio library" << endl;
-
+    std::string tokens = configuration.tokensPath();
+    std::string encoder = configuration.encoderPath();
+    std::string decoder = configuration.decoderPath();
+    std::string joiner = configuration.joinerPath();
     
     // validate paths
-    if (!IsFileExist(configuration.tokensPath()) || !IsFileExist(configuration.encoderPath())
-        || !IsFileExist(configuration.decoderPath()) || !IsFileExist(configuration.joinerPath()))
+    if (!IsFileExist(tokens) || !IsFileExist(encoder)
+        || !IsFileExist(decoder) || !IsFileExist(joiner))
     {
         throw std::invalid_argument("invalid model path");
-    }
-        
-    config.context_score = configuration.contextScore;
+    }        
+    
+    config.model_config.tokens = tokens.c_str();   
+    config.model_config.transducer.encoder = encoder.c_str();   
+    config.model_config.transducer.decoder = decoder.c_str();   
+    config.model_config.transducer.joiner = joiner.c_str();
 
-    config.model_config.tokens = configuration.tokensPath().c_str();
+    config.context_score = configuration.contextScore;
     config.decoding_method = configuration.decodeMethod.c_str();
     config.model_config.num_threads = (int32_t)configuration.numThreads;
     config.enable_endpoint = (int32_t)configuration.enableEndPoint;
@@ -700,10 +706,7 @@ SpeechRecognizer::InitializeRecognition()
     config.rule2_min_trailing_silence = configuration.rule2;
     config.rule3_min_utterance_length = configuration.rule3;
     config.feat_config.sample_rate = (int32_t)configuration.modelSampleRate;
-    config.feat_config.feature_dim = (int32_t)configuration.featureDim;
-    config.model_config.transducer.encoder = configuration.encoderPath().c_str();
-    config.model_config.transducer.decoder = configuration.decoderPath().c_str();
-    config.model_config.transducer.joiner = configuration.joinerPath().c_str();
+    config.feat_config.feature_dim = (int32_t)configuration.featureDim;    
     config.model_config.debug = (int32_t)configuration.debug;
     config.max_active_paths = (int32_t)configuration.numActivePaths;
     config.model_config.provider = configuration.provider.c_str();
