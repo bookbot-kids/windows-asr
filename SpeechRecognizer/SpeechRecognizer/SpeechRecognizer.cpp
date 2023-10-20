@@ -87,6 +87,7 @@ SpeechRecognizer::initialize(std::string recordingId_s, std::string recordingPat
         cout << "Failed to CoInitializeEx()" << endl;
         return hr;
     }*/
+    cout << "Start to initialize()" << endl;
     hr = MFStartup(MF_VERSION);
     if (hr != S_OK) {
         cout << "Failed to MFStartup()" << endl;
@@ -692,12 +693,8 @@ SpeechRecognizer::InitializeRecognition()
     {
         throw std::invalid_argument("invalid model path");
     }
-
-    if (configuration.decodeMethod.empty())
-        sherpaConfig.decoding_method = "greedy_search"; // greedy_search or modified_beam_search
-    else
-        sherpaConfig.decoding_method = configuration.decodeMethod;
-
+        
+    sherpaConfig.decoding_method = configuration.decodeMethod;
     sherpaConfig.num_threads = configuration.numThreads;
     sherpaConfig.use_vulkan_compute = configuration.useVulkanCompute;
     sherpaConfig.num_active_paths = configuration.numActivePaths;
@@ -729,8 +726,13 @@ SpeechRecognizer::InitializeRecognition()
     config.model_config.provider = sherpaConfig.provider.c_str();
     config.model_config.model_type = sherpaConfig.model_type.c_str();    
 
+    cout << "Initializing Recognition create recognizer" << endl;
     sherpaRecognizer = CreateOnlineRecognizer(&config);
+
+    cout << "Initializing Recognition create stream" << endl;
     sherpaStream = CreateOnlineStream(sherpaRecognizer);
+
+    cout << "Initializing Recognition complete" << endl;
 
     return S_OK;
 }
