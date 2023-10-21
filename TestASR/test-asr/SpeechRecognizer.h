@@ -211,6 +211,7 @@ private:
     std::string recordingId;
     std::string recordingPath;
     SpeechRecognizerStatus recognizerStatus;
+    bool isInitialized;
 
     vector < std::function<void(const std::string&, bool, bool)> > recogCallbackList;
     vector < std::function<void(float)> > levelCallbackList;

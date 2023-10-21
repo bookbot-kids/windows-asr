@@ -43,6 +43,7 @@ SpeechRecognizer::SpeechRecognizer()
     recordingId = "0";
     recordingPath = "";
     recognizerStatus = SpeechRecognizerStart;
+    isInitialized = false;
 }
 
 SpeechRecognizer::SpeechRecognizer(const Configuration& config)
@@ -53,6 +54,7 @@ SpeechRecognizer::SpeechRecognizer(const Configuration& config)
 
     configuration = config;
     recognizerStatus = SpeechRecognizerStart;
+    isInitialized = false;
 }
 
 SpeechRecognizer::SpeechRecognizer(const Configuration& config, std::string speechText_s, std::string recordingId_s)
@@ -63,6 +65,7 @@ SpeechRecognizer::SpeechRecognizer(const Configuration& config, std::string spee
     configuration = config;
 
     recognizerStatus = SpeechRecognizerStart;
+    isInitialized = false;
 }
 
 SpeechRecognizer::~SpeechRecognizer()
@@ -111,6 +114,7 @@ SpeechRecognizer::initialize(std::string recordingId_s, std::string recordingPat
     WaveHdrSherpaList.clear();
 
     cout << "Initialize Library Done" << endl;
+    isInitialized = true;
     recognizerStatus = SpeechRecognizerNormal;
 
     return hr;
@@ -185,7 +189,7 @@ static void CALLBACK RecordingWavInProc(HWAVEIN hwi, UINT uMsg, DWORD_PTR dwInst
 HRESULT
 SpeechRecognizer::listen()
 {
-    if (recognizerStatus == SpeechRecognizerStart)
+    if (!isInitialized || recognizerStatus == SpeechRecognizerStart)
     {
         cout << "Initialize the library first" << endl;
         return S_FALSE;
@@ -276,7 +280,7 @@ LPCWSTR ConvertToLPCWSTR(const std::string& str)
 HRESULT
 SpeechRecognizer::stopListening()
 {
-    if (recognizerStatus == SpeechRecognizerStart)
+    if (!isInitialized || recognizerStatus == SpeechRecognizerStart)
     {
         cout << "Initialize the library first" << endl;
         return S_FALSE;
@@ -404,7 +408,7 @@ SpeechRecognizer::stopListening()
 HRESULT
 SpeechRecognizer::mute()
 {
-    if (recognizerStatus == SpeechRecognizerStart)
+    if (!isInitialized || recognizerStatus == SpeechRecognizerStart)
     {
         cout << "Initialize the library first" << endl;
         return S_FALSE;
@@ -432,7 +436,7 @@ SpeechRecognizer::mute()
 HRESULT
 SpeechRecognizer::unmute()
 {
-    if (recognizerStatus == SpeechRecognizerStart)
+    if (!isInitialized || recognizerStatus == SpeechRecognizerStart)
     {
         cout << "Initialize the library first" << endl;
         return S_FALSE;
@@ -471,7 +475,7 @@ SpeechRecognizer::unmute()
 void
 SpeechRecognizer::release()
 {
-    if (recognizerStatus == SpeechRecognizerStart)
+    if (!isInitialized || recognizerStatus == SpeechRecognizerStart)
     {
         cout << "Initialize the library first" << endl;
         return;
@@ -496,9 +500,17 @@ SpeechRecognizer::release()
 void
 SpeechRecognizer::resetSpeech()
 {
+    if (!isInitialized || recognizerStatus == SpeechRecognizerStart)
+    {
+        cout << "Initialize the library first" << endl;
+        return;
+    }
     //DestroyStream(sherpaStream);
     //DestroyRecognizer(sherpaRecognizer);
     //InitializeRecognition();
+    if (!isInitialized) {
+        return;
+    }
 
     Reset(sherpaRecognizer, sherpaStream);
 
@@ -507,6 +519,12 @@ SpeechRecognizer::resetSpeech()
 void
 SpeechRecognizer::flushSpeech(std::string speechText_s)
 {
+    if (!isInitialized || recognizerStatus == SpeechRecognizerStart)
+    {
+        cout << "Initialize the library first" << endl;
+        return;
+    }
+
     speechText = speechText_s;
 }
 
@@ -551,6 +569,12 @@ void SpeechRecognizer::setContextBiasing(const int32_t* const* context_list,
     int32_t num_vectors,
     const int32_t* vector_sizes)
 {
+    if (!isInitialized || recognizerStatus == SpeechRecognizerStart)
+    {
+        cout << "Initialize the library first" << endl;
+        return;
+    }
+
     sherpaStream = CreateOnlineStreamWithContext(sherpaRecognizer, context_list, num_vectors, vector_sizes);
 }
 
