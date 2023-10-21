@@ -44,6 +44,7 @@
 #include <ctime>
 #include <sstream>
 #include <iomanip>
+#include <queue>
 
 #include "WWMFResampler.h"
 #include "c-api.h"
@@ -201,9 +202,10 @@ public:
     // Convert wav to aac 
     HRESULT ConvertWavToAac(LPCWSTR inputFilePath, LPCWSTR outputFilePath);
 
+    // Set Context biasing 
     void setContextBiasing(const int32_t* const* context_list,
         int32_t num_vectors,
-        const int32_t* vector_sizes);
+        const int32_t* vector_sizes, bool destroyStream);
 
 private:
     Configuration configuration;
@@ -213,8 +215,9 @@ private:
     SpeechRecognizerStatus recognizerStatus;
     bool isInitialized;
 
-    vector < std::function<void(const std::string&, bool, bool)> > recogCallbackList;
-    vector < std::function<void(float)> > levelCallbackList;
+    vector<std::function<void(const std::string&, bool, bool)>> recogCallbackList;
+    vector<std::function<void(float)>> levelCallbackList;
+    queue<std::function<void()>> threadCallbackList;
 private:
     // resample variables and functions
     WWMFResampler iResampler;

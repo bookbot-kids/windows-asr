@@ -82,6 +82,11 @@ SpeechRecognizer::initialize(std::string recordingId_s, std::string recordingPat
     recordingId = recordingId_s;
     recordingPath = recordingPath_s;
 
+    if (isInitialized) {
+        cout << "Already initialize" << endl;
+        return S_FALSE;
+    }
+
     HRESULT hr = S_OK;
 
     // Core initialize
@@ -420,15 +425,17 @@ SpeechRecognizer::mute()
         return S_OK;
     }
 
-    recognizerStatus = SpeechRecognizerMute;
+    threadCallbackList.push([&] {
+        recognizerStatus = SpeechRecognizerMute;
 
-    if (waveInStop(hWaveIn) != MMSYSERR_NOERROR)
-    {
-        std::cout << "Failed to mute" << std::endl;
-        return S_FALSE;
-    }
+        if (waveInStop(hWaveIn) != MMSYSERR_NOERROR)
+        {
+            std::cout << "Failed to mute" << std::endl;
+            return S_FALSE;
+        }
 
-    cout << "the status changed to Mute" << endl;
+        cout << "the status changed to Mute" << endl;
+    });
 
     return S_OK;
 }
@@ -447,28 +454,31 @@ SpeechRecognizer::unmute()
         return S_OK;
     }
 
-    recognizerStatus = SpeechRecognizerListen;
+    threadCallbackList.push([&] {
+        recognizerStatus = SpeechRecognizerListen;
 
-    // Create new buffer for recording
-    WAVEHDR* WaveHdr = new WAVEHDR;
-    BYTE* buffer = new BYTE[WAVBLOCK_SIZE];
+        // Create new buffer for recording
+        WAVEHDR* WaveHdr = new WAVEHDR;
+        BYTE* buffer = new BYTE[WAVBLOCK_SIZE];
 
-    WaveHdr->lpData = (LPSTR)buffer;
-    WaveHdr->dwBufferLength = WAVBLOCK_SIZE * NUMBER_OF_CHANNELS;
-    WaveHdr->dwBytesRecorded = 0;
-    WaveHdr->dwUser = 0L;
-    WaveHdr->dwFlags = 0L;
-    WaveHdr->dwLoops = 0L;
+        WaveHdr->lpData = (LPSTR)buffer;
+        WaveHdr->dwBufferLength = WAVBLOCK_SIZE * NUMBER_OF_CHANNELS;
+        WaveHdr->dwBytesRecorded = 0;
+        WaveHdr->dwUser = 0L;
+        WaveHdr->dwFlags = 0L;
+        WaveHdr->dwLoops = 0L;
 
-    waveInPrepareHeader(hWaveIn, WaveHdr, sizeof(WAVEHDR));
-    waveInAddBuffer(hWaveIn, WaveHdr, sizeof(WAVEHDR));
+        waveInPrepareHeader(hWaveIn, WaveHdr, sizeof(WAVEHDR));
+        waveInAddBuffer(hWaveIn, WaveHdr, sizeof(WAVEHDR));
 
-    // Start listening
-    if (waveInStart(hWaveIn) != MMSYSERR_NOERROR)
-    {
-        cout << "Error to unmute!" << endl;
-        return S_FALSE;
-    }
+        // Start listening
+        if (waveInStart(hWaveIn) != MMSYSERR_NOERROR)
+        {
+            cout << "Error to unmute!" << endl;
+            return S_FALSE;
+        }
+    });
+   
     return S_OK;
 }
 
@@ -487,6 +497,11 @@ SpeechRecognizer::release()
     }
 
     recognizerStatus = SpeechRecognizerRelease;
+    isInitialized = false;
+
+    while (!threadCallbackList.empty()) {
+        threadCallbackList.pop();
+    }
 
     MFShutdown();
     //CoUninitialize();
@@ -508,12 +523,10 @@ SpeechRecognizer::resetSpeech()
     //DestroyStream(sherpaStream);
     //DestroyRecognizer(sherpaRecognizer);
     //InitializeRecognition();
-    if (!isInitialized) {
-        return;
-    }
 
-    Reset(sherpaRecognizer, sherpaStream);
-
+    threadCallbackList.push([&]{ 
+        Reset(sherpaRecognizer, sherpaStream);
+    });
 }
 
 void
@@ -524,8 +537,10 @@ SpeechRecognizer::flushSpeech(std::string speechText_s)
         cout << "Initialize the library first" << endl;
         return;
     }
-
-    speechText = speechText_s;
+   
+    threadCallbackList.push([&] {
+        speechText = speechText_s;
+    });
 }
 
 template<typename T, typename... U>
@@ -567,7 +582,7 @@ void SpeechRecognizer::removeAllLevelListeners()
 
 void SpeechRecognizer::setContextBiasing(const int32_t* const* context_list,
     int32_t num_vectors,
-    const int32_t* vector_sizes)
+    const int32_t* vector_sizes, bool destroyStream)
 {
     if (!isInitialized || recognizerStatus == SpeechRecognizerStart)
     {
@@ -575,7 +590,14 @@ void SpeechRecognizer::setContextBiasing(const int32_t* const* context_list,
         return;
     }
 
-    sherpaStream = CreateOnlineStreamWithContext(sherpaRecognizer, context_list, num_vectors, vector_sizes);
+    threadCallbackList.push([&]{
+        if (destroyStream && sherpaStream) {
+            DestroyOnlineStream(sherpaStream);
+            sherpaStream = NULL;
+        }
+
+        sherpaStream = CreateOnlineStreamWithContext(sherpaRecognizer, context_list, num_vectors, vector_sizes);
+    });   
 }
 
 
@@ -862,6 +884,12 @@ SpeechRecognizer::ProcessResampleRecogThread()
 {
     while (1)
     {
+        while (!threadCallbackList.empty()) {
+            std::function<void()> task = threadCallbackList.front();
+            threadCallbackList.pop();
+            task();
+        }
+
         if (recognizerStatus == SpeechRecognizerListen)
         {
             HRESULT hr;
