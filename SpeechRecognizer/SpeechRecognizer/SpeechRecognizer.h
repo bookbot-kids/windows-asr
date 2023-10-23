@@ -227,8 +227,8 @@ private:
     HRESULT FinalizeResample();
 
     // recognition variables and functions
-    SherpaOnnxOnlineRecognizer* sherpaRecognizer;
-    SherpaOnnxOnlineStream* sherpaStream;
+    std::atomic<SherpaOnnxOnlineRecognizer*> sherpaRecognizer;
+    std::atomic<SherpaOnnxOnlineStream*> sherpaStream;
 
     HRESULT InitializeRecognition();
     HRESULT FinializeRecognition();
@@ -236,6 +236,7 @@ private:
     std::thread * recogThread;
     void ProcessResampleRecogThread();
     bool IsFileExist(const std::string fileName);
+    bool isRecording;
 
 public:
     SherpaOnnxOnlineRecognizerConfig config;
