@@ -599,9 +599,7 @@ void SpeechRecognizer::removeAllLevelListeners()
     levelCallbackList.clear();
 }
 
-void SpeechRecognizer::setContextBiasing(const int32_t* const* context_list,
-    int32_t num_vectors,
-    const int32_t* vector_sizes, bool destroyStream)
+void SpeechRecognizer::setContextBiasing(std::vector<std::vector<int32_t>> contextList, bool destroyStream)
 {
     if (!isInitialized || recognizerStatus == SpeechRecognizerStart)
     {
@@ -609,7 +607,7 @@ void SpeechRecognizer::setContextBiasing(const int32_t* const* context_list,
         return;
     }
 
-    threadCallbackList.push([this, context_list, num_vectors, vector_sizes, destroyStream]{
+    threadCallbackList.push([this, contextList, destroyStream]{
         cout << "Run setContextBiasing" << endl;
         if (destroyStream && this->sherpaStream.load()) {
             try {
@@ -630,10 +628,48 @@ void SpeechRecognizer::setContextBiasing(const int32_t* const* context_list,
 
         cout << "call CreateOnlineStreamWithContext" << endl;
         try {
-            auto newStream = CreateOnlineStreamWithContext(this->sherpaRecognizer.load(), context_list, num_vectors, vector_sizes);
+            std::vector<int32_t> vectorSizesRaw;
+            for (auto& vec : contextList) {
+                auto size = static_cast<int32_t>(vec.size());
+                vectorSizesRaw.push_back(size);
+            }
+
+            // Convert contextList to a raw pointer representation
+            std::vector<int32_t*> contextListRaw;
+            contextListRaw.reserve(contextList.size());
+            for (size_t i = 0; i < contextList.size(); ++i) {
+                auto temp = contextList[i];
+                int32_t* data = temp.data();
+                contextListRaw.push_back(data);
+            }
+
+            cout << "[vectorSizesRaw] " << vectorSizesRaw.size() << endl;
+            for (const auto& element : vectorSizesRaw) {
+                std::cout << element << " ";
+            }
+            std::cout << std::endl;
+
+            cout << "[contextList] " << contextList.size() << endl;
+            for (const auto& innerVec : contextList) {
+                for (const auto& num : innerVec) {
+                    std::cout << num << ' ';
+                }
+                std::cout << '\n';
+            }
+
+            auto size = static_cast<int32_t>(contextList.size());
+            int32_t** contextListRawArray = new int32_t * [size];
+            for (std::size_t i = 0; i < size; ++i) {
+                contextListRawArray[i] = contextListRaw[i];
+            }
+            auto vectorSizeList = const_cast<const int32_t*>(vectorSizesRaw.data());
+
+            auto newStream = CreateOnlineStreamWithContext(this->sherpaRecognizer.load(), contextListRawArray, size, vectorSizeList);
             cout << "created new stream" << endl;
             this->sherpaStream.store(newStream);
-            cout << "Replaced stream" << endl;            
+            cout << "Replaced stream" << endl;
+            delete[] contextListRawArray;
+            cout << "Release data" << endl;
         }
         catch (const std::exception& e) { // This will catch all standard exceptions
             std::cerr << "Can not create new stream error: " << e.what() << '\n';
