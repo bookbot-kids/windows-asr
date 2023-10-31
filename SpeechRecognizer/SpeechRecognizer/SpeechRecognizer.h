@@ -236,7 +236,7 @@ private:
     std::thread * recogThread;
     void ProcessResampleRecogThread();
     bool IsFileExist(const std::string fileName);
-    bool isRecording;
+    std::atomic<bool> isRecording;
 
 public:
     SherpaOnnxOnlineRecognizerConfig config;

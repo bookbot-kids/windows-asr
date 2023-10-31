@@ -44,6 +44,7 @@ SpeechRecognizer::SpeechRecognizer()
     recordingPath = "";
     recognizerStatus = SpeechRecognizerStart;
     isInitialized = false;
+    isRecording = false;
 }
 
 SpeechRecognizer::SpeechRecognizer(const Configuration& config)
@@ -55,6 +56,7 @@ SpeechRecognizer::SpeechRecognizer(const Configuration& config)
     configuration = config;
     recognizerStatus = SpeechRecognizerStart;
     isInitialized = false;
+    isRecording = false;
 }
 
 SpeechRecognizer::SpeechRecognizer(const Configuration& config, std::string speechText_s, std::string recordingId_s)
@@ -66,6 +68,7 @@ SpeechRecognizer::SpeechRecognizer(const Configuration& config, std::string spee
 
     recognizerStatus = SpeechRecognizerStart;
     isInitialized = false;
+    isRecording = false;
 }
 
 SpeechRecognizer::~SpeechRecognizer()
@@ -199,7 +202,7 @@ SpeechRecognizer::listen()
         cout << "Initialize the library first" << endl;
         return S_FALSE;
     }
-    if (recognizerStatus == SpeechRecognizerListen)
+    if (recognizerStatus == SpeechRecognizerListen || isRecording.load())
     {
         cout << "Recognizer is already listening";
         return S_FALSE;
@@ -294,7 +297,7 @@ SpeechRecognizer::stopListening()
         return S_FALSE;
     }
 
-    if (!(recognizerStatus == SpeechRecognizerListen || recognizerStatus == SpeechRecognizerMute || !isRecording))
+    if (!(recognizerStatus == SpeechRecognizerListen || recognizerStatus == SpeechRecognizerMute || !isRecording.load()))
     {
         cout << "Please listen to the audio first" << endl;
         return S_FALSE;
@@ -925,7 +928,7 @@ SpeechRecognizer::isSerpaRecording()
 void
 SpeechRecognizer::ProcessResampleRecogThread()
 {
-    while (isRecording)
+    while (isRecording.load())
     {
         try {
             while (!threadCallbackList.empty()) {
@@ -974,7 +977,7 @@ SpeechRecognizer::ProcessResampleRecogThread()
                 recogIt++;
                 curRecogBockIndex++;
             }
-            else if (recognizerStatus == SpeechRecognizerRelease || recognizerStatus == SpeechRecognizerStopListen || !isRecording)
+            else if (recognizerStatus == SpeechRecognizerRelease || recognizerStatus == SpeechRecognizerStopListen || !isRecording.load())
                 break;
             else {
                 Sleep(10);
