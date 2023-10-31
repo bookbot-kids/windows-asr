@@ -624,6 +624,8 @@ void SpeechRecognizer::setContextBiasing(const int32_t* const* context_list,
             catch (...) { 
                 std::cerr << "unkown error can not delete stream" << '\n';
             }
+
+            Sleep(50);
         }
 
         cout << "call CreateOnlineStreamWithContext" << endl;
@@ -631,7 +633,7 @@ void SpeechRecognizer::setContextBiasing(const int32_t* const* context_list,
             auto newStream = CreateOnlineStreamWithContext(this->sherpaRecognizer.load(), context_list, num_vectors, vector_sizes);
             cout << "created new stream" << endl;
             this->sherpaStream.store(newStream);
-            cout << "Replaced stream" << endl;
+            cout << "Replaced stream" << endl;            
         }
         catch (const std::exception& e) { // This will catch all standard exceptions
             std::cerr << "Can not create new stream error: " << e.what() << '\n';
@@ -639,7 +641,16 @@ void SpeechRecognizer::setContextBiasing(const int32_t* const* context_list,
         catch (...) { // This will catch any type of exception (even non-standard)
             std::cerr << "unkown error can not create new stream" << '\n';
         }
+
+        if (!this->sherpaStream.load()) {
+            cout << "Cannot create context stream, try to create new normal stream" << endl;
+            auto newStream = CreateOnlineStream(this->sherpaRecognizer.load());
+            cout << "created new normal stream" << endl;
+            this->sherpaStream.store(newStream);
+            cout << "Replaced normal stream" << endl;
+        }
         
+        Sleep(50);
         cout << "End setContextBiasing" << endl;
     });   
 }
@@ -893,7 +904,8 @@ SpeechRecognizer::Recognize(int8_t* sampledBytes, int nBytes, int index)
         for (auto& it : recogCallbackList) {
             it(recogText, is_endpoint, true);
         }
-        resetSpeech();
+        //resetSpeech();
+        Reset(this->sherpaRecognizer.load(), this->sherpaStream.load());
     }
 
     DestroyOnlineRecognizerResult(r);
